@@ -9,8 +9,39 @@ kernel void filter_r(global const uchar* A, global uchar* B) {
 	int image_size = get_global_size(0)/3; //each image consists of 3 colour channels
 	int colour_channel = id / image_size; // 0 - red, 1 - green, 2 - blue
 
-	//this is just a copy operation, modify to filter out the individual colour channels
-	B[id] = A[id];
+	// only keeps red and blue pixels
+	if (colour_channel == 0	|| colour_channel == 2){
+		B[id] = A[id];
+	}
+}
+
+kernel void invert(global const uchar* A, global uchar* B) {
+	int id = get_global_id(0);
+
+	unsigned char intensity =  A[id];
+
+    // Adjust the intensity value
+    intensity = (unsigned char) (255 - A[id]);
+
+    // Write the new intensity value back to the buffer
+    B[id] = intensity;
+}
+
+
+kernel void rgb2grey(global const uchar* A, global uchar* B) {
+	int id = get_global_id(0);   
+
+
+    unsigned char red = A[id];
+    unsigned char green = A[id + 1];
+    unsigned char blue = A[id + 2];
+
+    // Convert RGB to greyscale using Y = 0.2126R + 0.7152G + 0.0722B
+    unsigned char grey = (unsigned char) (0.2126 * red + 0.7152 * green + 0.0722f * blue);
+
+    // Write the greyscale value back to the buffer for each of the three channels
+    B[id] = A[grey];
+    
 }
 
 //simple ND identity kernel

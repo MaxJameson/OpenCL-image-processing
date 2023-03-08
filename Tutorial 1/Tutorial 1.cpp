@@ -101,10 +101,12 @@ int main(int argc, char **argv) {
 
 		cl::Event prof_event2;
 
+		// gets local workgroup size
 		cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0]; // get device
 		cerr << kernel_add.getWorkGroupInfo<CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE>(device) << endl; // get info
 		int local_size = kernel_add.getWorkGroupInfo<CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE>(device);
 
+		// runs the multiple and add kernels on the vectors
 		queue.enqueueNDRangeKernel(kernel_mult, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event);
 
 		queue.enqueueNDRangeKernel(kernel_add, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event);
