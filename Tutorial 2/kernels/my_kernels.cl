@@ -29,7 +29,8 @@ kernel void invert(global const uchar* A, global uchar* B) {
 
 
 kernel void rgb2grey(global const uchar* A, global uchar* B) {
-	int id = get_global_id(0);   
+	int id = get_global_id(0);
+	int channels = get_global_size(2); //number of colour channels: 3 for RGB
 
 
     unsigned char red = A[id];
@@ -37,12 +38,43 @@ kernel void rgb2grey(global const uchar* A, global uchar* B) {
     unsigned char blue = A[id + 2];
 
     // Convert RGB to greyscale using Y = 0.2126R + 0.7152G + 0.0722B
-    unsigned char grey = (unsigned char) (0.2126 * red + 0.7152 * green + 0.0722f * blue);
+    unsigned char grey = (unsigned char) (0.2126f * red + 0.7152f * green + 0.0722f * blue);
 
     // Write the greyscale value back to the buffer for each of the three channels
     B[id] = A[grey];
     
 }
+
+kernel void rgb2grey2(global const uchar* A, global uchar* B) {
+	int id = get_global_id(0);
+	int channels = get_global_size(2); //number of colour channels: 3 for RGB
+	int image_size = get_global_size(0)/3; //each image consists of 3 colour channels
+	int colour_channel = id / image_size; // 0 - red, 1 - green, 2 - blue
+
+	unsigned char grey = A[id];
+
+	// only keeps red and blue pixels
+	if (colour_channel == 0){
+		grey = (unsigned char) (0.2126f);
+		B[id] = grey; 
+	}
+
+	// only keeps red and blue pixels
+	else if (colour_channel == 1){
+
+		grey = (unsigned char) (0.7152f);
+		B[id] = grey; 
+	}
+
+	// only keeps red and blue pixels
+	else if (colour_channel == 2){
+
+		grey = (unsigned char) (0.0722f);
+		B[id] = grey; 
+	}
+
+}
+
 
 //simple ND identity kernel
 kernel void identityND(global const uchar* A, global uchar* B) {
