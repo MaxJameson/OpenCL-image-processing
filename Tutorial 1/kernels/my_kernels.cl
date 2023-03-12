@@ -23,7 +23,16 @@ kernel void multAdd(global const float* A, global const float* B, global float* 
 //a simple smoothing kernel averaging values in a local window (radius 1)
 kernel void avg_filter(global const float* A, global float* B) {
 	int id = get_global_id(0);
-	B[id] = (A[id - 1] + A[id] + A[id + 1])/3;
+
+	if (id == 0) { // perform this part only once i.e. for work item 0
+		B[id] = (A[id] + A[id + 1])/2;
+	}
+	else if(id == 9){
+		B[id] = (A[id - 1] + A[id])/2;
+	}
+	else{
+		B[id] = (A[id - 1] + A[id] + A[id + 1])/3;
+	}
 }
 
 //a simple 2D kernel

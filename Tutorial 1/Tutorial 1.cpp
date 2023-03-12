@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 		kernel_mult.setArg(1, buffer_B); 
 		kernel_mult.setArg(2, buffer_C);
 
-		cl::Kernel kernel_add = cl::Kernel(program, "add");
+		cl::Kernel kernel_add = cl::Kernel(program, "add2D");
 		kernel_add.setArg(0, buffer_C);
 		kernel_add.setArg(1, buffer_B);
 		kernel_add.setArg(2, buffer_C);
@@ -96,6 +96,10 @@ int main(int argc, char **argv) {
 		kernel_multadd.setArg(0, buffer_A);
 		kernel_multadd.setArg(1, buffer_B);
 		kernel_multadd.setArg(2, buffer_C);
+
+		cl::Kernel kernel_average = cl::Kernel(program, "avg_filter");
+		kernel_average.setArg(0, buffer_A);
+		kernel_average.setArg(1, buffer_C);
 
 		cl::Event prof_event;
 
@@ -106,13 +110,14 @@ int main(int argc, char **argv) {
 		cerr << kernel_add.getWorkGroupInfo<CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE>(device) << endl; // get info
 		int local_size = kernel_add.getWorkGroupInfo<CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE>(device);
 
+
 		// runs the multiple and add kernels on the vectors
+
+
 		queue.enqueueNDRangeKernel(kernel_mult, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event);
 
-		queue.enqueueNDRangeKernel(kernel_add, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event);
+		queue.enqueueNDRangeKernel(kernel_add, cl::NullRange, cl::NDRange(5,2), cl::NullRange, NULL, &prof_event);
 	
-
-
 		//4.3 Copy the result from device to host
 		queue.enqueueReadBuffer(buffer_C, CL_TRUE, 0, vector_size, &C[0]);
 
@@ -130,6 +135,12 @@ int main(int argc, char **argv) {
 		std::cout << "Vector A memeory transfer time: " << A_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - A_event.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 		std::cout << "Vector B memrory transfer time: " << B_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - B_event.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
+		std::cout << "" << std::endl;
+
+
+		// multi add single kernel
+
+
 		queue.enqueueNDRangeKernel(kernel_multadd, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event2);
 
 		//4.3 Copy the result from device to host
@@ -141,6 +152,16 @@ int main(int argc, char **argv) {
 
 		// outputs amount of time task took to complete
 		std::cout << "Kernel execution time [ns]:" << prof_event2.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_event.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+		std::cout << "" << std::endl;
+
+		// average stencil
+		queue.enqueueNDRangeKernel(kernel_average, cl::NullRange, cl::NDRange(vector_elements), cl::NullRange, NULL, &prof_event2);
+
+		//4.3 Copy the result from device to host
+		queue.enqueueReadBuffer(buffer_C, CL_TRUE, 0, vector_size, &C[0]);
+
+		std::cout << "A = " << A << std::endl;
+		std::cout << "C = " << C << std::endl;
 
 	}
 	catch (cl::Error err) {
