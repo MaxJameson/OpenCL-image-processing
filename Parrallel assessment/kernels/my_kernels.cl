@@ -15,6 +15,16 @@ kernel void filter_r(global const uchar* A, global uchar* B) {
 	}
 }
 
+//a simple OpenCL kernel which copies all pixels from A to B
+kernel void histogram(global const uchar* A, global uint* H) {
+	int id = get_global_id(0);
+	const uchar pixel = A[id];
+	const int bin = (int)pixel;
+
+	atomic_inc(&H[bin]);
+}
+
+
 kernel void invert(global const uchar* A, global uchar* B) {
 	int id = get_global_id(0);
 
@@ -23,8 +33,21 @@ kernel void invert(global const uchar* A, global uchar* B) {
     // Adjust the intensity value
     intensity = (unsigned char) (255 - A[id]);
 
-    // Write the new intensity value back to the buffer
-    B[id] = intensity;
+	if (id == 0){
+		printf("Size: %d\n", get_global_size(0));
+	}
+
+	int stop = (get_global_size(0) / 3) * 2;
+
+	if(id <= 30){
+		B[id] = 0;
+	}
+	else{
+	    // Write the new intensity value back to the buffer
+		B[id] = intensity;
+	}
+
+
 }
 
 

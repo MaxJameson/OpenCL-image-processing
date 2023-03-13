@@ -6,6 +6,7 @@
 
 using namespace cimg_library;
 
+
 void print_help() {
 	std::cerr << "Application usage:" << std::endl;
 
@@ -96,11 +97,34 @@ int main(int argc, char **argv) {
 		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
 		CImgDisplay disp_output(output_image,"output");
 
+		// creates buffer for histogram
+		cl::Buffer histogramBuffer(context, CL_MEM_WRITE_ONLY, 256 * sizeof(unsigned int));
+
+		// sets up kernel for histogram
+		cl::Kernel histogramKernel(program, "histogram");
+		histogramKernel.setArg(0, dev_image_input);
+		histogramKernel.setArg(1, histogramBuffer);
+
+		// runs histogram kernel
+		queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
+
+		// creates vector to store histogram results
+		std::vector<unsigned int> histogramData(256);
+
+		// reads results from buffer
+		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
+
+		// displays each bin along with amount of values
+		for (int i = 0; i < histogramData.size(); i++) {
+			std::cout << "Bin: " << i << " | Number of pixels in bin: " << histogramData[i] << endl;
+		}
+
+
  		while (!disp_input.is_closed() && !disp_output.is_closed()
 			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
 		    disp_input.wait(1);
 		    disp_output.wait(1);
-	    }		
+	    }	
 
 	}
 	catch (const cl::Error& err) {
