@@ -73,32 +73,15 @@ int main(int argc, char **argv) {
 
 		//Part 4 - device operations
 
+		/////////////// Create histogram - Map
+
+		// creates buffer for histogram
 		//device - buffers
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
-		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, image_input.size()); //should be the same as input image
-//		cl::Buffer dev_convolution_mask(context, CL_MEM_READ_ONLY, convolution_mask.size()*sizeof(float));
+		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
 
 		//4.1 Copy images to device memory
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
-//		queue.enqueueWriteBuffer(dev_convolution_mask, CL_TRUE, 0, convolution_mask.size()*sizeof(float), &convolution_mask[0]);
-
-		//4.2 Setup and execute the kernel (i.e. device code)
-		cl::Kernel kernel = cl::Kernel(program, "invert");
-		kernel.setArg(0, dev_image_input);
-		kernel.setArg(1, dev_image_output);
-//		kernel.setArg(2, dev_convolution_mask);
-
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
-
-		vector<unsigned char> output_buffer(image_input.size());
-		//4.3 Copy the result from device to host
-		queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
-
-		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-		CImgDisplay disp_output(output_image,"output");
-
-		// creates buffer for histogram
-		cl::Buffer histogramBuffer(context, CL_MEM_WRITE_ONLY, 256 * sizeof(unsigned int));
 
 		// sets up kernel for histogram
 		cl::Kernel histogramKernel(program, "histogram");
@@ -114,11 +97,94 @@ int main(int argc, char **argv) {
 		// reads results from buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
 
-		// displays each bin along with amount of values
-		for (int i = 0; i < histogramData.size(); i++) {
-			std::cout << "Bin: " << i << " | Number of pixels in bin: " << histogramData[i] << endl;
-		}
 
+		/////////////// Create cumulative histogram - scan Blelloch
+
+		std::cout << "Cumulative histogram " << endl;
+
+		// creates buffer for histogram
+		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
+
+
+		//4.1 Copy images to device memory
+		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
+
+		// sets up kernel for histogram
+		cl::Kernel C_histogramKernel(program, "C_histogram");
+		C_histogramKernel.setArg(0, ChistogramBuffer);
+
+		// runs histogram kernel
+		queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
+
+		// creates vector to store histogram results
+		std::vector<unsigned int> CumulativeHistogramData(256);
+
+		// reads results from buffer
+		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+
+
+		// may use reduce
+		std::cout << *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end()) << endl;
+		std::cout << *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end()) << endl;
+
+
+		/////////////// Create normalised histogram - Map
+
+		std::cout << "Cumulative normalised histogram " << endl;
+
+		unsigned int minNum = *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
+		unsigned int maxNum = *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
+
+		// creates buffer for histogram
+		cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+		cl::Buffer maxNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+		cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
+
+
+		//4.1 Copy images to device memory
+		queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL);
+		queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL);
+		queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
+
+		// sets up kernel for histogram
+		cl::Kernel N_histogramKernel(program, "N_histogram");
+		N_histogramKernel.setArg(0, NhistogramBuffer);
+		N_histogramKernel.setArg(1, minNumBuffer);
+		N_histogramKernel.setArg(2, maxNumBuffer);
+
+		// runs histogram kernel
+		queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
+
+		// creates vector to store histogram results
+		std::vector<unsigned int> NormalisedHistogramData(256);
+
+		// reads results from buffer
+		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
+
+
+
+		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, 256 * sizeof(unsigned int));
+		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, image_input.size()); //should be the same as input image
+
+
+		//4.1 Copy images to device memory
+		queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
+
+		//4.2 Setup and execute the kernel (i.e. device code)
+		cl::Kernel kernel = cl::Kernel(program, "equalise");
+		kernel.setArg(0, dev_image_input);
+		kernel.setArg(1, dev_image_output);
+		kernel.setArg(2, BPhistogramBuffer);
+		//		kernel.setArg(2, dev_convolution_mask);
+
+		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
+
+		vector<unsigned char> output_buffer(image_input.size());
+		//4.3 Copy the result from device to host
+		queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
+
+		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+		CImgDisplay disp_output(output_image, "output");
 
  		while (!disp_input.is_closed() && !disp_output.is_closed()
 			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {

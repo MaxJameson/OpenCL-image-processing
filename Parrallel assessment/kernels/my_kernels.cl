@@ -1,19 +1,3 @@
-//a simple OpenCL kernel which copies all pixels from A to B
-kernel void identity(global const uchar* A, global uchar* B) {
-	int id = get_global_id(0);
-	B[id] = A[id];
-}
-
-kernel void filter_r(global const uchar* A, global uchar* B) {
-	int id = get_global_id(0);
-	int image_size = get_global_size(0)/3; //each image consists of 3 colour channels
-	int colour_channel = id / image_size; // 0 - red, 1 - green, 2 - blue
-
-	// only keeps red and blue pixels
-	if (colour_channel == 0	|| colour_channel == 2){
-		B[id] = A[id];
-	}
-}
 
 //a simple OpenCL kernel which copies all pixels from A to B
 kernel void histogram(global const uchar* A, global uint* H) {
@@ -23,6 +7,70 @@ kernel void histogram(global const uchar* A, global uint* H) {
 
 	atomic_inc(&H[bin]);
 }
+
+//a simple OpenCL kernel which copies all pixels from A to B
+kernel void C_histogram(global  uint* A) {
+	int id = get_global_id(0);
+	int n = get_global_size(0);
+	int t;
+
+	for (int stride = 1; stride < n; stride *=2){
+
+		if(((id+1) % (stride*2)) == 0){
+			A[id] += A[id - stride];
+		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
+	}
+
+	if(id == 0){
+		A[n-1] = 0;
+	}
+
+	barrier(CLK_GLOBAL_MEM_FENCE);
+
+	for (int stride = n/2; stride > 0; stride /=2){
+
+		if(((id+1) % (stride*2)) == 0){
+			t = A[id];
+			A[id] += A[id - stride];
+			A[id - stride] = t;
+		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
+	}
+
+}
+
+//a simple OpenCL kernel which copies all pixels from A to B
+kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
+	int id = get_global_id(0);
+	uint minScale = 0;
+	uint maxScale = 255;
+
+	if (id == 0){
+		printf("Max %d\n", *max);
+		printf("Min %d\n", *min);
+	}
+
+	A[id] = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
+
+}
+
+//a simple OpenCL kernel which copies all pixels from A to B
+kernel void equalise( global uchar* in, global uchar* out,global uint* hist) {
+	int id = get_global_id(0);
+	int in_intensity = in[id];
+	int new_intensity = 0;
+
+	if(id == get_global_size(0)){
+		new_intensity = hist[in_intensity];
+	}
+	else{
+		new_intensity = hist[in_intensity + 1];
+	}
+
+	out[id] = new_intensity;
+}
+
 
 
 kernel void invert(global const uchar* A, global uchar* B) {
@@ -48,109 +96,4 @@ kernel void invert(global const uchar* A, global uchar* B) {
 	}
 
 
-}
-
-
-kernel void rgb2grey(global const uchar* A, global uchar* B) {
-	int id = get_global_id(0);
-
-	int image_size = get_global_size(0)/3; //each image consists of 3 colour channels
-	int colour_channel = id / image_size; // 0 - red, 1 - green, 2 - blue
-
-	// only keeps red and blue pixels
-	if (colour_channel == 0){
-		int r = A[id];
-		int g = A[id + image_size];
-		int b = A[id + (image_size * 2)];
-		B[id] = 0.21f*r + 0.71f*g + 0.07f*b;
-	}
-	// only keeps red and blue pixels
-	if (colour_channel == 1){
-		int r = A[id - image_size];
-		int g = A[id];
-		int b = A[id - image_size];
-		B[id] = 0.21f*r + 0.71f*g + 0.07f*b;
-	}
-	// only keeps red and blue pixels
-	if (colour_channel == 2){
-		int r = A[id - (image_size * 2)];
-		int g = A[id - image_size];
-		int b = A[id];
-		B[id] = 0.21f*r + 0.71f*g + 0.07f*b;
-	}
-	
-    
-}
-
-
-//simple ND identity kernel
-kernel void identityND(global const uchar* A, global uchar* B) {
-	int width = get_global_size(0); //image width in pixels
-	int height = get_global_size(1); //image height in pixels
-	int image_size = width*height; //image size in pixels
-	int channels = get_global_size(2); //number of colour channels: 3 for RGB
-
-	int x = get_global_id(0); //current x coord.
-	int y = get_global_id(1); //current y coord.
-	int c = get_global_id(2); //current colour channel
-
-	int id = x + y*width + c*image_size; //global id in 1D space
-
-	B[id] = A[id];
-}
-
-//2D averaging filter
-kernel void avg_filterND(global const uchar* A, global uchar* B) {
-	int width = get_global_size(0); //image width in pixels
-	int height = get_global_size(1); //image height in pixels
-	int image_size = width*height; //image size in pixels
-	int channels = get_global_size(2); //number of colour channels: 3 for RGB
-
-	int x = get_global_id(0); //current x coord.
-	int y = get_global_id(1); //current y coord.
-	int c = get_global_id(2); //current colour channel
-
-	int id = x + y*width + c*image_size; //global id in 1D space
-
-	uint result = 0;
-
-	//simple boundary handling - just copy the original pixel
-	if ((x == 0) || (x == width-1) || (y == 0) || (y == height-1)) {
-		result = A[id];	
-	} else {
-		for (int i = (x-1); i <= (x+1); i++)
-		for (int j = (y-1); j <= (y+1); j++) 
-			result += A[i + j*width + c*image_size];
-
-		result /= 9;
-	}
-
-	B[id] = (uchar)result;
-}
-
-//2D 3x3 convolution kernel
-kernel void convolutionND(global const uchar* A, global uchar* B, constant float* mask) {
-	int width = get_global_size(0); //image width in pixels
-	int height = get_global_size(1); //image height in pixels
-	int image_size = width*height; //image size in pixels
-	int channels = get_global_size(2); //number of colour channels: 3 for RGB
-
-	int x = get_global_id(0); //current x coord.
-	int y = get_global_id(1); //current y coord.
-	int c = get_global_id(2); //current colour channel
-
-	int id = x + y*width + c*image_size; //global id in 1D space
-
-	float result = 0;
-
-	//simple boundary handling - just copy the original pixel
-	if ((x == 0) || (x == width-1) || (y == 0) || (y == height-1)) {
-		result = A[id];	
-	} else {
-		for (int i = (x-1); i <= (x+1); i++)
-		for (int j = (y-1); j <= (y+1); j++) 
-			result += A[i + j*width + c*image_size]*mask[i-(x-1) + j-(y-1)];
-	}
-
-	B[id] = (uchar)result;
 }
