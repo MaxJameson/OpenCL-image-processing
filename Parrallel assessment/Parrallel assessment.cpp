@@ -38,10 +38,6 @@ int main(int argc, char **argv) {
 		CImg<unsigned char> image_input(image_filename.c_str());
 		CImgDisplay disp_input(image_input,"input");
 
-		//a 3x3 convolution mask implementing an averaging filter
-		std::vector<float> convolution_mask = { 1.f / 9, 1.f / 9, 1.f / 9,
-												1.f / 9, 1.f / 9, 1.f / 9,
-												1.f / 9, 1.f / 9, 1.f / 9 };
 
 		//Part 3 - host operations
 		//3.1 Select computing devices
@@ -71,82 +67,64 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
-		//Part 4 - device operations
 
-		/////////////// Create histogram - Map
+		/////////////// Create base histogram - histogram kernel
 
-		// creates buffer for histogram
-		//device - buffers
+		// creates and writes buffers for input image and histogram data
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
 		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
-
-		//4.1 Copy images to device memory
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
 
-		// sets up kernel for histogram
-		cl::Kernel histogramKernel(program, "histogram");
+		// creates kernel and sets argumements
+		cl::Kernel histogramKernel(program, "histogram_Local");
 		histogramKernel.setArg(0, dev_image_input);
 		histogramKernel.setArg(1, histogramBuffer);
+		// local memory argument
+		histogramKernel.setArg(2, 256 * sizeof(unsigned int), NULL);
 
-		// runs histogram kernel
+		// runs kernel
 		queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
-
-		// creates vector to store histogram results
+		
+		// creates vector to store output
 		std::vector<unsigned int> histogramData(256);
-
-		// reads results from buffer
+		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
 
 
 		/////////////// Create cumulative histogram - scan Blelloch
 
-		std::cout << "Cumulative histogram " << endl;
-
-		// creates buffer for histogram
+		// creates and writes buffer for histogram data
 		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
-
-
-		//4.1 Copy images to device memory
 		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
 
-		// sets up kernel for histogram
+		// sets up kernel for cumulative histogram histogram and passes arguments
 		cl::Kernel C_histogramKernel(program, "C_histogram");
 		C_histogramKernel.setArg(0, ChistogramBuffer);
 
-		// runs histogram kernel
+		// runs kernel
 		queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
 
-		// creates vector to store histogram results
+		// creates vector to store output
 		std::vector<unsigned int> CumulativeHistogramData(256);
-
-		// reads results from buffer
+		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
-
-
-		// may use reduce
-		std::cout << *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end()) << endl;
-		std::cout << *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end()) << endl;
 
 
 		/////////////// Create normalised histogram - Map
 
-		std::cout << "Cumulative normalised histogram " << endl;
-
+		// stores the smallest and largest intensity values in the picture - !!!!!!!!!!!!!!!!!!!!!! May use reduce to find
 		unsigned int minNum = *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
 		unsigned int maxNum = *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
 
-		// creates buffer for histogram
+		// creates and writes buffers for min value, max value and normalised histogram
 		cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		cl::Buffer maxNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
-
-
-		//4.1 Copy images to device memory
 		queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL);
 		queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL);
 		queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
 
-		// sets up kernel for histogram
+		// sets up kernel for normalisation and passes arguments
 		cl::Kernel N_histogramKernel(program, "N_histogram");
 		N_histogramKernel.setArg(0, NhistogramBuffer);
 		N_histogramKernel.setArg(1, minNumBuffer);
@@ -157,32 +135,33 @@ int main(int argc, char **argv) {
 
 		// creates vector to store histogram results
 		std::vector<unsigned int> NormalisedHistogramData(256);
-
 		// reads results from buffer
 		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 
 
+		/////////////// Equalise Image - Map
 
+		// creates and writes buffer for normalised histogram and output image
 		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, 256 * sizeof(unsigned int));
 		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, image_input.size()); //should be the same as input image
-
-
-		//4.1 Copy images to device memory
 		queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
 
-		//4.2 Setup and execute the kernel (i.e. device code)
+		// sets up kernel for back propogation and passes arguments
 		cl::Kernel kernel = cl::Kernel(program, "equalise");
 		kernel.setArg(0, dev_image_input);
 		kernel.setArg(1, dev_image_output);
 		kernel.setArg(2, BPhistogramBuffer);
-		//		kernel.setArg(2, dev_convolution_mask);
 
+		// runs kernel
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
 
+		// creates vector to store equalisation results
 		vector<unsigned char> output_buffer(image_input.size());
-		//4.3 Copy the result from device to host
+		// reads results from buffer
 		queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
 
+
+		// displays input and output images to users
 		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
 		CImgDisplay disp_output(output_image, "output");
 

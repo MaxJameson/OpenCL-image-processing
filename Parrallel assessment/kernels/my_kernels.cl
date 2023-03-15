@@ -1,10 +1,37 @@
 
-//a simple OpenCL kernel which copies all pixels from A to B
+// Counts occurence of each intensity
 kernel void histogram(global const uchar* A, global uint* H) {
+	
+	// gets the current index
 	int id = get_global_id(0);
+
+	// gets the intensity value from the image
 	const uchar pixel = A[id];
 	const int bin = (int)pixel;
 
+	// uses an atomic function to increment the current intensity
+	atomic_inc(&H[bin]);
+}
+
+kernel void histogram_Local(global const uchar* A, global uint* H, local uchar* LocalMem) {
+	// gets the current index for global and local memeory
+	int id = get_global_id(0);
+	int lid = get_local_id(0);
+
+	// stores the global data is local memory
+	LocalMem[lid] = A[id];
+
+	// Uses a barrier to sync local memeory loading
+	barrier(CLK_GLOBAL_MEM_FENCE);
+
+	// gets the intensity value from the image
+	const uchar pixel = LocalMem[lid];
+	const int bin = (int)pixel;
+
+	// Uses a barrier to sync intensity calculation
+	barrier(CLK_GLOBAL_MEM_FENCE);
+
+	// uses an atomic function to increment the current intensity
 	atomic_inc(&H[bin]);
 }
 
@@ -44,12 +71,7 @@ kernel void C_histogram(global  uint* A) {
 kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	int id = get_global_id(0);
 	uint minScale = 0;
-	uint maxScale = 255;
-
-	if (id == 0){
-		printf("Max %d\n", *max);
-		printf("Min %d\n", *min);
-	}
+	uint maxScale = 256;
 
 	A[id] = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
 
@@ -69,31 +91,4 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist) {
 	}
 
 	out[id] = new_intensity;
-}
-
-
-
-kernel void invert(global const uchar* A, global uchar* B) {
-	int id = get_global_id(0);
-
-	unsigned char intensity =  A[id];
-
-    // Adjust the intensity value
-    intensity = (unsigned char) (255 - A[id]);
-
-	if (id == 0){
-		printf("Size: %d\n", get_global_size(0));
-	}
-
-	int stop = (get_global_size(0) / 3) * 2;
-
-	if(id <= 30){
-		B[id] = 0;
-	}
-	else{
-	    // Write the new intensity value back to the buffer
-		B[id] = intensity;
-	}
-
-
 }
