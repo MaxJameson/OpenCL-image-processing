@@ -1,16 +1,17 @@
 
 // Counts occurence of each intensity
-kernel void histogram(global const uchar* A, global uint* H) {
+kernel void histogram(global const uchar* A, global uint* H, global uint* binsDivider) {
 	
 	// gets the current index
 	int id = get_global_id(0);
 
 	// gets the intensity value from the image
 	const uchar pixel = A[id];
-	const int bin = (int)pixel;
+	float bin = (int)pixel / (int)binsDivider;
+	int location = round(bin);
 
 	// uses an atomic function to increment the current intensity
-	atomic_inc(&H[bin]);
+	atomic_inc(&H[location]);
 }
 
 kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider,local uchar* LocalMem, local uint* Localbin) {

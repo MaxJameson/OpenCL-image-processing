@@ -35,9 +35,13 @@ int main(int argc, char **argv) {
 
 	//detect any potential exceptions
 	try {
+
+
 		CImg<unsigned char> image_input(image_filename.c_str());
 		CImgDisplay disp_input(image_input,"input");
 
+
+		
 
 		//Part 3 - host operations
 		//3.1 Select computing devices
@@ -69,7 +73,7 @@ int main(int argc, char **argv) {
 
 		// stores amount of bits per pixel - need to be changed later
 		unsigned int bits = 256;
-		unsigned int bins = 64;
+		unsigned int bins = 256;
 		unsigned int binsDivider;
 
 		if (bins >= bits) {
