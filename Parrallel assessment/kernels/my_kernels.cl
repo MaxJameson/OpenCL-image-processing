@@ -13,26 +13,27 @@ kernel void histogram(global const uchar* A, global uint* H) {
 	atomic_inc(&H[bin]);
 }
 
-kernel void histogram_Local(global const uchar* A, global uint* H, local uchar* LocalMem) {
+kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider,local uchar* LocalMem, local uint* Localbin) {
 	// gets the current index for global and local memeory
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 
 	// stores the global data is local memory
 	LocalMem[lid] = A[id];
+	Localbin = *binsDivider;
 
 	// Uses a barrier to sync local memeory loading
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
+
+
 	// gets the intensity value from the image
 	const uchar pixel = LocalMem[lid];
-	const int bin = (int)pixel;
-
-	// Uses a barrier to sync intensity calculation
-	barrier(CLK_GLOBAL_MEM_FENCE);
+	float bin = (int)pixel / (int)Localbin;
+	int location = round(bin);
 
 	// uses an atomic function to increment the current intensity
-	atomic_inc(&H[bin]);
+	atomic_inc(&H[location]);
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
@@ -71,7 +72,7 @@ kernel void C_histogram(global  uint* A) {
 kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	int id = get_global_id(0);
 	uint minScale = 0;
-	uint maxScale = 256;
+	uint maxScale = 255;
 
 	A[id] = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
 
@@ -82,8 +83,11 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist) {
 	int id = get_global_id(0);
 	int in_intensity = in[id];
 	int new_intensity = 0;
+	if (id == 0) { // perform this part only once i.e. for work item 0
+		printf("currentSize: %d\n", get_local_size(0) - 1);
+	}
 
-	if(id == get_global_size(0)){
+	if(in_intensity == get_global_size(0) - 1){
 		new_intensity = hist[in_intensity];
 	}
 	else{

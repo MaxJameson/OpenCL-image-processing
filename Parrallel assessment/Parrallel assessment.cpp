@@ -67,26 +67,43 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
+		// stores amount of bits per pixel - need to be changed later
+		unsigned int bits = 256;
+		unsigned int bins = 128;
+		unsigned int binsDivider;
+
+		if (bins >= bits) {
+			binsDivider = 1;
+		}
+		else {
+			binsDivider = bits / bins;
+		}
+
+		std::cout << binsDivider << std::endl;
 
 		/////////////// Create base histogram - histogram kernel
 
 		// creates and writes buffers for input image and histogram data
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
-		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
+		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+		cl::Buffer binsize(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
+		queue.enqueueWriteBuffer(binsize, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
 
 		// creates kernel and sets argumements
 		cl::Kernel histogramKernel(program, "histogram_Local");
 		histogramKernel.setArg(0, dev_image_input);
 		histogramKernel.setArg(1, histogramBuffer);
+		histogramKernel.setArg(2, binsize);
 		// local memory argument
-		histogramKernel.setArg(2, 256 * sizeof(unsigned int), NULL);
+		histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
+		histogramKernel.setArg(4, binsDivider, NULL);
 
 		// runs kernel
 		queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
 		
 		// creates vector to store output
-		std::vector<unsigned int> histogramData(256);
+		std::vector<unsigned int> histogramData(bins);
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
 
@@ -94,7 +111,7 @@ int main(int argc, char **argv) {
 		/////////////// Create cumulative histogram - scan Blelloch
 
 		// creates and writes buffer for histogram data
-		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
+		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
 
 		// sets up kernel for cumulative histogram histogram and passes arguments
@@ -105,7 +122,7 @@ int main(int argc, char **argv) {
 		queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
 
 		// creates vector to store output
-		std::vector<unsigned int> CumulativeHistogramData(256);
+		std::vector<unsigned int> CumulativeHistogramData(bins);
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 
@@ -119,7 +136,7 @@ int main(int argc, char **argv) {
 		// creates and writes buffers for min value, max value and normalised histogram
 		cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		cl::Buffer maxNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-		cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, 256 * sizeof(unsigned int));
+		cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 		queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL);
 		queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL);
 		queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
@@ -134,15 +151,19 @@ int main(int argc, char **argv) {
 		queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
 
 		// creates vector to store histogram results
-		std::vector<unsigned int> NormalisedHistogramData(256);
+		std::vector<unsigned int> NormalisedHistogramData(bins);
 		// reads results from buffer
 		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 
+		for (unsigned int i = 0; i < NormalisedHistogramData.size(); i++)
+		{
+			cout << "Bin: " << i << "Count: " << NormalisedHistogramData[i] << endl;
+		}
 
 		/////////////// Equalise Image - Map
 
 		// creates and writes buffer for normalised histogram and output image
-		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, 256 * sizeof(unsigned int));
+		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
 		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, image_input.size()); //should be the same as input image
 		queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
 
