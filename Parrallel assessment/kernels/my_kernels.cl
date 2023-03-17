@@ -79,9 +79,9 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
-kernel void equalise( global uchar* in, global uchar* out,global uint* hist) {
+kernel void equalise( global uchar* in, global uchar* out,global uint* hist, global uint* binsDivider) {
 	int id = get_global_id(0);
-	int in_intensity = in[id];
+	int in_intensity = in[id] / *binsDivider;
 	int new_intensity = 0;
 	if (id == 0) { // perform this part only once i.e. for work item 0
 		printf("currentSize: %d\n", get_local_size(0) - 1);

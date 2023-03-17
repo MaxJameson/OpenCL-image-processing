@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 
 		// stores amount of bits per pixel - need to be changed later
 		unsigned int bits = 256;
-		unsigned int bins = 128;
+		unsigned int bins = 64;
 		unsigned int binsDivider;
 
 		if (bins >= bits) {
@@ -155,10 +155,6 @@ int main(int argc, char **argv) {
 		// reads results from buffer
 		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 
-		for (unsigned int i = 0; i < NormalisedHistogramData.size(); i++)
-		{
-			cout << "Bin: " << i << "Count: " << NormalisedHistogramData[i] << endl;
-		}
 
 		/////////////// Equalise Image - Map
 
@@ -172,6 +168,7 @@ int main(int argc, char **argv) {
 		kernel.setArg(0, dev_image_input);
 		kernel.setArg(1, dev_image_output);
 		kernel.setArg(2, BPhistogramBuffer);
+		kernel.setArg(3, binsize);
 
 		// runs kernel
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
