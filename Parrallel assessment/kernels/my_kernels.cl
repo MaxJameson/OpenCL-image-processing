@@ -73,9 +73,11 @@ kernel void C_histogram(global  uint* A) {
 kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	int id = get_global_id(0);
 	uint minScale = 0;
-	uint maxScale = 255;
-
-	A[id] = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
+	uint maxScale = 256;
+	unsigned long long int normalised;
+	normalised = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
+	//printf("value: %lu\n", normalised);
+	A[id] = (int)normalised;
 
 }
 
@@ -84,9 +86,6 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 	int id = get_global_id(0);
 	int in_intensity = in[id] / *binsDivider;
 	int new_intensity = 0;
-	if (id == 0) { // perform this part only once i.e. for work item 0
-		printf("currentSize: %d\n", get_local_size(0) - 1);
-	}
 
 	if(in_intensity == get_global_size(0) - 1){
 		new_intensity = hist[in_intensity];

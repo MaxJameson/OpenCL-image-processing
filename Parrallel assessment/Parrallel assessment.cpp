@@ -159,6 +159,10 @@ int main(int argc, char **argv) {
 		// reads results from buffer
 		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 
+		for (int i = 0; i < NormalisedHistogramData.size(); i++) {
+			std::cout << "Bin: "<< i << " intensity: " << NormalisedHistogramData[i] << endl;
+		}
+
 
 		/////////////// Equalise Image - Map
 
