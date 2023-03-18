@@ -7,7 +7,7 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 
 	// gets the intensity value from the image
 	const uchar pixel = A[id];
-	float bin = (int)pixel / (int)binsDivider;
+	float bin = (uint)pixel / (uint)binsDivider;
 	int location = round(bin);
 
 	// uses an atomic function to increment the current intensity
@@ -30,7 +30,7 @@ kernel void histogram_Local(global const uchar* A, global uint* H, global uint* 
 
 	// gets the intensity value from the image
 	const uchar pixel = LocalMem[lid];
-	float bin = (int)pixel / (int)Localbin;
+	float bin = (uint)pixel / (uint)Localbin;
 	int location = round(bin);
 
 	// uses an atomic function to increment the current intensity
@@ -72,12 +72,13 @@ kernel void C_histogram(global  uint* A) {
 //a simple OpenCL kernel which copies all pixels from A to B
 kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	int id = get_global_id(0);
-	uint minScale = 0;
-	uint maxScale = 256;
-	unsigned long long int normalised;
+	int currentValue = A[id] / 10;
+	double minScale = 0;
+	double maxScale = 1;
+	double normalised;
 	normalised = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
 	//printf("value: %lu\n", normalised);
-	A[id] = (int)normalised;
+	A[id] = normalised * 255;
 
 }
 

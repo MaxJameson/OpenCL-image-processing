@@ -130,6 +130,10 @@ int main(int argc, char **argv) {
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 
+		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+		}
+
 
 		/////////////// Create normalised histogram - Map
 
