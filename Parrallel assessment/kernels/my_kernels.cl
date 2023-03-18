@@ -76,7 +76,7 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	double minScale = 0;
 	double maxScale = 1;
 	double normalised;
-	normalised = minScale + (A[id] - *min) * (maxScale - minScale) / (*max - *min);
+	normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
 	//printf("value: %lu\n", normalised);
 	A[id] = normalised * 255;
 

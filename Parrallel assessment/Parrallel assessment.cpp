@@ -140,6 +140,8 @@ int main(int argc, char **argv) {
 		// stores the smallest and largest intensity values in the picture - !!!!!!!!!!!!!!!!!!!!!! May use reduce to find
 		unsigned int minNum = *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
 		unsigned int maxNum = *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
+		minNum = minNum / 10;
+		maxNum = maxNum / 10;
 
 		// creates and writes buffers for min value, max value and normalised histogram
 		cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
