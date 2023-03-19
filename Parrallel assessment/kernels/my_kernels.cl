@@ -44,9 +44,11 @@ kernel void C_histogram(global  uint* A) {
 	int t;
 
 	for (int stride = 1; stride < n; stride *=2){
-
 		if(((id+1) % (stride*2)) == 0){
+
 			A[id] += A[id - stride];
+
+
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}
@@ -58,15 +60,16 @@ kernel void C_histogram(global  uint* A) {
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
 	for (int stride = n/2; stride > 0; stride /=2){
-
 		if(((id+1) % (stride*2)) == 0){
 			t = A[id];
 			A[id] += A[id - stride];
 			A[id - stride] = t;
+
+
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}
-
+	A[0] = 0;
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
@@ -76,9 +79,14 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	double minScale = 0;
 	double maxScale = 1;
 	double normalised;
-	normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
-	//printf("value: %lu\n", normalised);
-	A[id] = normalised * 255;
+	if(id == 0){
+		A[id] = 0;
+	}
+	else{
+		normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
+		A[id] = normalised * 255;
+	}
+
 
 }
 
@@ -88,11 +96,11 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 	int in_intensity = in[id] / *binsDivider;
 	int new_intensity = 0;
 
-	if(in_intensity == get_global_size(0) - 1){
-		new_intensity = hist[in_intensity];
+	if(id == 0){
+		new_intensity = hist[in_intensity + 1];
 	}
 	else{
-		new_intensity = hist[in_intensity + 1];
+		new_intensity = hist[in_intensity -1];
 	}
 
 	out[id] = new_intensity;

@@ -41,9 +41,19 @@ int main(int argc, char **argv) {
 		CImg<unsigned char> image_input(image_filename.c_str());
 		CImgDisplay disp_input(image_input,"input");
 
+		std::vector<unsigned char> pixels;
+		std::vector<unsigned char> ColourEnd;
+
 		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 			image_input = image_input.RGBtoYCbCr();
-			colour == true;
+			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
+			ColourEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
+			std::cout << &image_input << endl;
+			
+	
+		}
+		else {
+			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
 		}
 
 
@@ -89,42 +99,6 @@ int main(int argc, char **argv) {
 			binsDivider = bits / bins;
 		}
 
-		std::cout << binsDivider << std::endl;
-
-		// creates vector to store output
-		std::vector<unsigned int> histogramData(bins);
-
-		if (colour == false) {
-			/////////////// Create base histogram - histogram kernel for greyscale images
-
-			// creates and writes buffers for input image and histogram data
-			cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
-			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			cl::Buffer binsize(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-			queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
-			queue.enqueueWriteBuffer(binsize, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
-
-			// creates kernel and sets argumements
-			cl::Kernel histogramKernel(program, "histogram_Local");
-			histogramKernel.setArg(0, dev_image_input);
-			histogramKernel.setArg(1, histogramBuffer);
-			histogramKernel.setArg(2, binsize);
-			// local memory argument
-			histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
-			histogramKernel.setArg(4, binsDivider, NULL);
-
-			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
-
-			// creates vector to store output
-			std::vector<unsigned int> histogramData(bins);
-			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
-		}
-
-		else {
-			/////////////// Create base histogram - histogram kernel for colour images
-		}
 
 		/////////////// Create base histogram - histogram kernel
 
@@ -132,7 +106,7 @@ int main(int argc, char **argv) {
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
 		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 		cl::Buffer binsize(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
+		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0]);
 		queue.enqueueWriteBuffer(binsize, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
 
 		// creates kernel and sets argumements
@@ -151,6 +125,10 @@ int main(int argc, char **argv) {
 		std::vector<unsigned int> histogramData(bins);
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
+
+		for (int i = 0; i < histogramData.size(); i++) {
+			std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
+		}
 
 
 		/////////////// Create cumulative histogram - scan Blelloch
@@ -177,10 +155,18 @@ int main(int argc, char **argv) {
 
 
 		/////////////// Create normalised histogram - Map
+		unsigned int maxNum = *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
+		unsigned int minNum = maxNum;
+		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+			if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
+				minNum = CumulativeHistogramData[i];
+			}
+		}
+		std::cout << minNum << endl;
+		std::cout << maxNum << endl;
 
 		// stores the smallest and largest intensity values in the picture - !!!!!!!!!!!!!!!!!!!!!! May use reduce to find
-		unsigned int minNum = *min_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
-		unsigned int maxNum = *max_element(CumulativeHistogramData.begin(), CumulativeHistogramData.end());
+		//unsigned int minNum = *min_element(CumulativeHistogramData.begin() + 1, CumulativeHistogramData.end());
 		minNum = minNum / 10;
 		maxNum = maxNum / 10;
 
@@ -215,7 +201,7 @@ int main(int argc, char **argv) {
 
 		// creates and writes buffer for normalised histogram and output image
 		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
-		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, image_input.size()); //should be the same as input image
+		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size()); //should be the same as input image
 		queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
 
 		// sets up kernel for back propogation and passes arguments
@@ -226,24 +212,47 @@ int main(int argc, char **argv) {
 		kernel.setArg(3, binsize);
 
 		// runs kernel
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
+		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange);
 
 		// creates vector to store equalisation results
 		vector<unsigned char> output_buffer(image_input.size());
-		// reads results from buffer
-		queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
 
+		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 
-		// displays input and output images to users
-		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-		CImgDisplay disp_output(output_image, "output");
+			// creates vector to store equalisation results
+			vector<unsigned char> output_Colour_buffer(pixels.size());
+			// reads results from buffer
+			queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_Colour_buffer.size(), &output_Colour_buffer.data()[0]);
+			output_Colour_buffer.insert(end(output_Colour_buffer), begin(ColourEnd), end(ColourEnd));
+			output_buffer.assign(output_Colour_buffer.begin(), output_Colour_buffer.end());
 
- 		while (!disp_input.is_closed() && !disp_output.is_closed()
-			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-		    disp_input.wait(1);
-		    disp_output.wait(1);
-	    }	
+			// displays input and output images to users
+			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+			output_image = output_image.YCbCrtoRGB();
+			CImgDisplay disp_output(output_image, "output");
 
+			while (!disp_input.is_closed() && !disp_output.is_closed()
+				&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				disp_input.wait(1);
+				disp_output.wait(1);
+			}
+
+		}
+		else {
+
+			// reads results from buffer
+			queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
+
+			// displays input and output images to users
+			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+			CImgDisplay disp_output(output_image, "output");
+
+			while (!disp_input.is_closed() && !disp_output.is_closed()
+				&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				disp_input.wait(1);
+				disp_output.wait(1);
+			}
+		}
 	}
 	catch (const cl::Error& err) {
 		std::cerr << "ERROR: " << err.what() << ", " << getErrorString(err.err()) << std::endl;
