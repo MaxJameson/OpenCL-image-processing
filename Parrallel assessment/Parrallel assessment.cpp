@@ -36,9 +36,15 @@ int main(int argc, char **argv) {
 	//detect any potential exceptions
 	try {
 
+		bool colour = false;
 
 		CImg<unsigned char> image_input(image_filename.c_str());
 		CImgDisplay disp_input(image_input,"input");
+
+		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+			image_input = image_input.RGBtoYCbCr();
+			colour == true;
+		}
 
 
 		
@@ -84,6 +90,41 @@ int main(int argc, char **argv) {
 		}
 
 		std::cout << binsDivider << std::endl;
+
+		// creates vector to store output
+		std::vector<unsigned int> histogramData(bins);
+
+		if (colour == false) {
+			/////////////// Create base histogram - histogram kernel for greyscale images
+
+			// creates and writes buffers for input image and histogram data
+			cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
+			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+			cl::Buffer binsize(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+			queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, image_input.size(), &image_input.data()[0]);
+			queue.enqueueWriteBuffer(binsize, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
+
+			// creates kernel and sets argumements
+			cl::Kernel histogramKernel(program, "histogram_Local");
+			histogramKernel.setArg(0, dev_image_input);
+			histogramKernel.setArg(1, histogramBuffer);
+			histogramKernel.setArg(2, binsize);
+			// local memory argument
+			histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
+			histogramKernel.setArg(4, binsDivider, NULL);
+
+			// runs kernel
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
+
+			// creates vector to store output
+			std::vector<unsigned int> histogramData(bins);
+			// reads output histogram from the buffer
+			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
+		}
+
+		else {
+			/////////////// Create base histogram - histogram kernel for colour images
+		}
 
 		/////////////// Create base histogram - histogram kernel
 
