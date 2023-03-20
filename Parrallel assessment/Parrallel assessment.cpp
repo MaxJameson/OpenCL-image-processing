@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 		bool colour = false;
 
 		CImg<unsigned char> image_input(image_filename.c_str());
-		CImgDisplay disp_input(image_input,"input");
+
 
 		std::vector<unsigned char> pixels;
 		std::vector<unsigned char> ColourEnd;
@@ -87,16 +87,26 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
-		// stores amount of bits per pixel - need to be changed later
+		bool binCheck = false;
+		unsigned int bins;
 		unsigned int bits = 256;
-		unsigned int bins = 256;
 		unsigned int binsDivider;
+		while (!binCheck) {
+			cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
+			cin >> bins; // Get user input from the keyboard
+			if (bins < 32 || bins > 256) {
+				std::cout << "Invalid bin size: " << endl;
+			}
+			else {
+				binCheck = true;
+				if (bins = bits) {
+					binsDivider = 1;
+				}
+				else {
+					binsDivider = bits / bins;
+				}
+			}
 
-		if (bins >= bits) {
-			binsDivider = 1;
-		}
-		else {
-			binsDivider = bits / bins;
 		}
 
 
@@ -125,11 +135,6 @@ int main(int argc, char **argv) {
 		std::vector<unsigned int> histogramData(bins);
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
-
-		for (int i = 0; i < histogramData.size(); i++) {
-			std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
-		}
-
 
 		/////////////// Create cumulative histogram - scan Blelloch
 
@@ -229,6 +234,8 @@ int main(int argc, char **argv) {
 			// displays input and output images to users
 			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
 			output_image = output_image.YCbCrtoRGB();
+			image_input = image_input.YCbCrtoRGB();
+			CImgDisplay disp_input(image_input, "input");
 			CImgDisplay disp_output(output_image, "output");
 
 			while (!disp_input.is_closed() && !disp_output.is_closed()
@@ -245,6 +252,7 @@ int main(int argc, char **argv) {
 
 			// displays input and output images to users
 			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+			CImgDisplay disp_input(image_input, "input");
 			CImgDisplay disp_output(output_image, "output");
 
 			while (!disp_input.is_closed() && !disp_output.is_closed()

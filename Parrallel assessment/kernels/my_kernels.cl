@@ -64,12 +64,9 @@ kernel void C_histogram(global  uint* A) {
 			t = A[id];
 			A[id] += A[id - stride];
 			A[id - stride] = t;
-
-
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}
-	A[0] = 0;
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
@@ -79,7 +76,7 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	double minScale = 0;
 	double maxScale = 1;
 	double normalised;
-	if(id == 0){
+	if(id == 0 || A[id] == 0){
 		A[id] = 0;
 	}
 	else{
