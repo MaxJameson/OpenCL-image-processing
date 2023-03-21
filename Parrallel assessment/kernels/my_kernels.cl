@@ -69,6 +69,7 @@ kernel void C_histogram(global  uint* A) {
 	}
 }
 
+
 //a simple OpenCL kernel which copies all pixels from A to B
 kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	int id = get_global_id(0);

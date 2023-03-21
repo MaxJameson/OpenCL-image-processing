@@ -94,8 +94,11 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 			cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
 			cin >> bins; // Get user input from the keyboard
-			if (bins < 32 || bins > 256) {
-				std::cout << "Invalid bin size: " << endl;
+
+			if (bins < 32 || bins > 256 || !isdigit(bins)) {
+				std::cout << "Invalid input " << endl;
+				cin.clear();
+				cin.ignore(1, '\n');
 			}
 			else {
 				binCheck = true;
@@ -137,6 +140,19 @@ int main(int argc, char **argv) {
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
 
 		/////////////// Create cumulative histogram - scan Blelloch
+		string scanType;
+		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch: "; // Type a number and press enter
+		cin >> scanType; // Get user input from the keyboard
+		if (scanType == "H" || scanType == "h") {
+			std::cout << "Hillis-Steele selected" << endl;
+		}
+		else{
+			if(scanType != "B" || scanType != "b"){
+				std::cout << "Invalid selection, Default = Blelloch" << endl;
+			}
+			std::cout << "Blelloch selected" << endl;
+		}
+
 
 		// creates and writes buffer for histogram data
 		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
@@ -154,9 +170,9 @@ int main(int argc, char **argv) {
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 
-		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
-		}
+		//for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+		//}
 
 
 		/////////////// Create normalised histogram - Map
@@ -197,9 +213,9 @@ int main(int argc, char **argv) {
 		// reads results from buffer
 		queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 
-		for (int i = 0; i < NormalisedHistogramData.size(); i++) {
-			std::cout << "Bin: "<< i << " intensity: " << NormalisedHistogramData[i] << endl;
-		}
+		//for (int i = 0; i < NormalisedHistogramData.size(); i++) {
+			//std::cout << "Bin: "<< i << " intensity: " << NormalisedHistogramData[i] << endl;
+		//}
 
 
 		/////////////// Equalise Image - Map
