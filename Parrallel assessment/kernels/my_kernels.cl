@@ -124,3 +124,18 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 
 	out[id] = new_intensity;
 }
+
+
+kernel void reduce(global uint* A){
+	int id = get_local_id(0);
+	int N = get_local_size(0);
+
+	for(int stride=1; stride<N; stride*=2){
+		if((id % (stride*2)) == 0){
+			if(A[id] < A[id+stride] && A[id+stride] != 0){
+				A[id] = A[id+stride];
+			}
+		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
+	}
+}

@@ -205,15 +205,43 @@ int main(int argc, char **argv) {
 			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
 		//}
 
-
 		/////////////// Create normalised histogram - Map
 		unsigned int maxNum = CumulativeHistogramData.back();
 		unsigned int minNum = maxNum;
-		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
-				minNum = CumulativeHistogramData[i];
+		string minType;
+		cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial P = Parallel: "; // Type a number and press enter
+		cin >> minType; // Get user input from the keyboard
+		if (minType == "H" || minType == "h") {
+			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
+
+			// sets up kernel for normalisation and passes arguments
+			cl::Kernel reduce(program, "reduce");
+			reduce.setArg(0, NhistogramBuffer);
+			// creates vector to store histogram results
+			std::vector<unsigned int> minStorage(bins);
+			// reads results from buffer
+			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
+			for (int i = 0; i < minStorage.size(); i++) {
+				std::cout << "Bin: " << i << " intensity: " << minStorage[i] << endl;
 			}
+			minNum = minStorage[0];
+
+		
 		}
+		else {
+			if (minType != "S" || minType != "s") {
+				std::cout << "Invalid selection, Default = Serial" << endl;
+				for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+					if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
+						minNum = CumulativeHistogramData[i];
+					}
+				}
+
+			}
+			std::cout << "Blelloch selected" << endl;
+		}
+
 		std::cout << minNum << endl;
 		std::cout << maxNum << endl;
 
