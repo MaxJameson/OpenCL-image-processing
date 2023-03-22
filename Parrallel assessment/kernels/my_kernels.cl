@@ -1,40 +1,40 @@
 
 // Counts occurence of each intensity
-kernel void histogram(global const uchar* A, global uint* H, global uint* binsDivider) {
+kernel void histogram(global const uchar* A, global uint* H, global uint* binsDivider, global uint* bins) {
 	
 	// gets the current index
 	int id = get_global_id(0);
 
 	// gets the intensity value from the image
 	const uchar pixel = A[id];
-	float bin = (uint)pixel / (uint)binsDivider;
+	float bin = (uint)pixel / (*binsDivider);
 	int location = round(bin);
 
 	// uses an atomic function to increment the current intensity
 	atomic_inc(&H[location]);
 }
 
-kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider,local uchar* LocalMem, local uint* Localbin) {
+kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider, global uint* bins,local uint* LocalMem) {
 	// gets the current index for global and local memeory
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 
-	// stores the global data is local memory
-	LocalMem[lid] = A[id];
-	Localbin = *binsDivider;
-
 	// Uses a barrier to sync local memeory loading
-	barrier(CLK_GLOBAL_MEM_FENCE);
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 
 
 	// gets the intensity value from the image
-	const uchar pixel = LocalMem[lid];
-	float bin = (uint)pixel / (uint)Localbin;
-	int location = round(bin);
+	const uchar pixel = A[id];
+	float bin = (uint)pixel / (*binsDivider);
+	uint location = round(bin);
+	atomic_inc(&LocalMem[location]);
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// uses an atomic function to increment the current intensity
-	atomic_inc(&H[location]);
+	if(id < *bins){
+		atomic_add(&H[id], LocalMem[id]);
+	}
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B

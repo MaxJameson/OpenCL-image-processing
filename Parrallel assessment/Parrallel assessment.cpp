@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
 			cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
 			cin >> bins; // Get user input from the keyboard
 
-			if (bins < 32 || bins > 256 || !isdigit(bins)) {
+			if (bins < 32 || bins > 256) {
 				std::cout << "Invalid input " << endl;
 				cin.clear();
 				cin.ignore(1, '\n');
@@ -118,18 +118,21 @@ int main(int argc, char **argv) {
 		// creates and writes buffers for input image and histogram data
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
 		cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-		cl::Buffer binsize(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+		cl::Buffer numBins(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0]);
-		queue.enqueueWriteBuffer(binsize, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
+		queue.enqueueWriteBuffer(binDiv, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
+		queue.enqueueWriteBuffer(numBins, CL_TRUE, 0, sizeof(unsigned int), &bins, NULL);
 
 		// creates kernel and sets argumements
-		cl::Kernel histogramKernel(program, "histogram_Local");
+		cl::Kernel histogramKernel(program, "histogram");
 		histogramKernel.setArg(0, dev_image_input);
 		histogramKernel.setArg(1, histogramBuffer);
-		histogramKernel.setArg(2, binsize);
+		histogramKernel.setArg(2, binDiv);
+		histogramKernel.setArg(3, numBins);
 		// local memory argument
-		histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
-		histogramKernel.setArg(4, binsDivider, NULL);
+		//histogramKernel.setArg(4, bins * sizeof(unsigned int), NULL);
+
 
 		// runs kernel
 		queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
@@ -138,6 +141,10 @@ int main(int argc, char **argv) {
 		std::vector<unsigned int> histogramData(bins);
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0,histogramData.size() * sizeof(unsigned int),histogramData.data());
+
+		for (int i = 0; i < histogramData.size(); i++) {
+			std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
+		}
 
 		/////////////// Create cumulative histogram - scan Blelloch
 		string scanType;
@@ -170,9 +177,9 @@ int main(int argc, char **argv) {
 		// reads output histogram from the buffer
 		queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 
-		//for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
-		//}
+		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+		}
 
 
 		/////////////// Create normalised histogram - Map
@@ -230,7 +237,7 @@ int main(int argc, char **argv) {
 		kernel.setArg(0, dev_image_input);
 		kernel.setArg(1, dev_image_output);
 		kernel.setArg(2, BPhistogramBuffer);
-		kernel.setArg(3, binsize);
+		kernel.setArg(3, binDiv);
 
 		// runs kernel
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange);
