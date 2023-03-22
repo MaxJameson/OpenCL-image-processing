@@ -5,6 +5,7 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 	// gets the current index
 	int id = get_global_id(0);
 
+
 	// gets the intensity value from the image
 	const uchar pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
@@ -14,27 +15,29 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 	atomic_inc(&H[location]);
 }
 
-kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider, global uint* bins,local uint* LocalMem) {
+kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider, global uint* size,local uint* LocalMem) {
 	// gets the current index for global and local memeory
 	int id = get_global_id(0);
-	int lid = get_local_id(0);
 
 	// Uses a barrier to sync local memeory loading
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-
+	if(id == 0){
+		printf("local size %d\n", get_local_size(0));
+	}
 
 	// gets the intensity value from the image
 	const uchar pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
 	uint location = round(bin);
+	//printf("work group size %d\n", &LocalMem[location]);
 	atomic_inc(&LocalMem[location]);
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	// uses an atomic function to increment the current intensity
-	if(id < *bins){
-		atomic_add(&H[id], LocalMem[id]);
+	if((id%32) == 0){
+		atomic_add(&H[location], LocalMem[location]);
 	}
+
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
@@ -66,6 +69,24 @@ kernel void C_histogram(global  uint* A) {
 			A[id - stride] = t;
 		}
 		barrier(CLK_GLOBAL_MEM_FENCE);
+	}
+}
+
+//Hillis-Steele basic inclusive scan
+//requires additional buffer B to avoid data overwrite 
+kernel void C_histogramhs(global uint* A, global uint* B) {
+	int id = get_global_id(0);
+	int N = get_global_size(0);
+	global int* C;
+
+	for (int stride = 1; stride <= N; stride *= 2) {
+		B[id] = A[id];
+		if (id >= stride)
+			B[id] += A[id - stride];
+
+		barrier(CLK_GLOBAL_MEM_FENCE); //sync the step
+
+		C = A; A = B; B = C; //swap A & B between steps
 	}
 }
 
