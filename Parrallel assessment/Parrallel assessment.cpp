@@ -87,6 +87,8 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
+		std::cout << "" << endl;
+
 		bool binCheck = false;
 		unsigned int bins;
 		unsigned int bits = 256;
@@ -112,6 +114,7 @@ int main(int argc, char **argv) {
 
 		}
 
+		std::cout << "" << endl;
 
 		/////////////// Create base histogram - histogram kernel
 
@@ -151,7 +154,7 @@ int main(int argc, char **argv) {
 		// creates vector to store output
 		std::vector<unsigned int> CumulativeHistogramData(bins);
 		string scanType;
-		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch: "; // Type a number and press enter
+		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch S = Serial: "; // Type a number and press enter
 		cin >> scanType; // Get user input from the keyboard
 		if (scanType == "H" || scanType == "h") {
 
@@ -175,6 +178,13 @@ int main(int argc, char **argv) {
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 		}
+		else if (scanType == "S" || scanType == "s") {
+			std::cout << "Serial selected" << endl;
+			for (int i = 1; i < histogramData.size(); i++) {
+				histogramData[i] += histogramData[i-1];
+			}
+			CumulativeHistogramData = histogramData;
+		}
 		else{
 			if(scanType != "B" || scanType != "b"){
 
@@ -197,6 +207,7 @@ int main(int argc, char **argv) {
 			}
 			std::cout << "Blelloch selected" << endl;
 		}
+		std::cout << "" << endl;
 
 
 
@@ -211,7 +222,7 @@ int main(int argc, char **argv) {
 		string minType;
 		cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial P = Parallel: "; // Type a number and press enter
 		cin >> minType; // Get user input from the keyboard
-		if (minType == "H" || minType == "h") {
+		if (minType == "P" || minType == "p") {
 			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
 
@@ -222,25 +233,26 @@ int main(int argc, char **argv) {
 			std::vector<unsigned int> minStorage(bins);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
-			for (int i = 0; i < minStorage.size(); i++) {
-				std::cout << "Bin: " << i << " intensity: " << minStorage[i] << endl;
-			}
-			minNum = minStorage[0];
+			//for (int i = 0; i < minStorage.size(); i++) {
+				//std::cout << "Bin: " << i << " intensity: " << minStorage[i] << endl;
+			//}
+			//minNum = minStorage[0];
 
 		
 		}
 		else {
 			if (minType != "S" || minType != "s") {
 				std::cout << "Invalid selection, Default = Serial" << endl;
-				for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-					if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
-						minNum = CumulativeHistogramData[i];
-					}
-				}
 
 			}
-			std::cout << "Blelloch selected" << endl;
+			std::cout << "Serial selected" << endl;
+			for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+				if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
+					minNum = CumulativeHistogramData[i];
+				}
+			}
 		}
+		std::cout << "" << endl;
 
 		std::cout << minNum << endl;
 		std::cout << maxNum << endl;
