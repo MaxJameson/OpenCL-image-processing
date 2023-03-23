@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 #include "Utils.h"
@@ -192,13 +193,13 @@ int main(int argc, char **argv) {
 			
 		}
 		std::cout << "Base Histogram" << endl;
-		std::cout << "Bin: " << 0 << " intensity: " << histogramData[0] << endl;
-		std::cout << "Bin: " << 1 << " intensity: " << histogramData[0] << endl;
-		std::cout << "Bin: " << 254 << " intensity: " << histogramData[254] << endl;
-		std::cout << "Bin: " << 255 << " intensity: " << histogramData[255] << endl;
-		//for (int i = 0; i < histogramData.size(); i++) {
-		//	std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
-		//}
+		ofstream histFile;
+		histFile.open("Base_Histogram.csv");
+		for (int i = 0; i < histogramData.size(); i++) {
+			//std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
+			histFile << i << "," << histogramData[i] << endl;
+		}
+
 
 		std::cout << "" << endl;
 
@@ -262,13 +263,14 @@ int main(int argc, char **argv) {
 ;
 
 		std::cout << "Cumulative Histogram" << endl;
-		//std::cout << "Bin: " << 0 << " intensity: " << CumulativeHistogramData[0] << endl;
-		//std::cout << "Bin: " << 1 << " intensity: " << CumulativeHistogramData[0] << endl;
-		//std::cout << "Bin: " << 254 << " intensity: " << CumulativeHistogramData[254] << endl;
-		//std::cout << "Bin: " << 255 << " intensity: " << CumulativeHistogramData[255] << endl;
+		ofstream CumulativeHistFile;
+		CumulativeHistFile.open("Cumulative_Histogram.csv");
 		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+			CumulativeHistFile << i << "," << CumulativeHistogramData[i] << endl;
 		}
+
+
 
 		std::cout << "" << endl;
 
@@ -395,16 +397,18 @@ int main(int argc, char **argv) {
 		}
 
 		std::cout << "Normalised Histogram" << endl;
-		std::cout << "Bin: " << 0 << " intensity: " << NormalisedHistogramData[0] << endl;
-		std::cout << "Bin: " << 1 << " intensity: " << NormalisedHistogramData[0] << endl;
-		std::cout << "Bin: " << 254 << " intensity: " << NormalisedHistogramData[254] << endl;
-		std::cout << "Bin: " << 255 << " intensity: " << NormalisedHistogramData[255] << endl;
+
+		ofstream NormalisedHistFile;
+		NormalisedHistFile.open("Normalised_Histogram.csv");
+		for (int i = 0; i < NormalisedHistogramData.size(); i++) {
+			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+			NormalisedHistFile << i << "," << NormalisedHistogramData[i] << endl;
+		}
+
 		std::cout << "" << endl;
 
 
-		//for (int i = 0; i < NormalisedHistogramData.size(); i++) {
-			//std::cout << "Bin: "<< i << " intensity: " << NormalisedHistogramData[i] << endl;
-		//}
+
 
 
 		////////////////////////////////////////////////////////
@@ -434,30 +438,11 @@ int main(int argc, char **argv) {
 			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
 				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
-				// displays input and output images to users
-				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-				//output_image = output_image.YCbCrtoRGB();
-				//image_input = image_input.YCbCrtoRGB();
-				//CImgDisplay disp_input(image_input, "input");
-				//CImgDisplay disp_output(output_image, "output");
-
-				//while (!disp_input.is_closed() && !disp_output.is_closed()
-				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				//	disp_input.wait(1);
-				//	disp_output.wait(1);
-				//}
+	
 			}
 			else {
 				output_buffer = temp_output_buffer;
-				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-				//CImgDisplay disp_input(image_input, "input");
-				//CImgDisplay disp_output(output_image, "output");
 
-				//while (!disp_input.is_closed() && !disp_output.is_closed()
-				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				//	disp_input.wait(1);
-				//	disp_output.wait(1);
-				//}
 			}
 		
 
@@ -491,18 +476,7 @@ int main(int argc, char **argv) {
 				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
 				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
 
-				//// displays input and output images to users
-				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-				//output_image = output_image.YCbCrtoRGB();
-				//image_input = image_input.YCbCrtoRGB();
-				//CImgDisplay disp_input(image_input, "input");
-				//CImgDisplay disp_output(output_image, "output");
 
-				//while (!disp_input.is_closed() && !disp_output.is_closed()
-				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				//	disp_input.wait(1);
-				//	disp_output.wait(1);
-				//}
 
 			}
 			else {
@@ -510,16 +484,6 @@ int main(int argc, char **argv) {
 				// reads results from buffer
 				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
 
-				//// displays input and output images to users
-				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-				//CImgDisplay disp_input(image_input, "input");
-				//CImgDisplay disp_output(output_image, "output");
-
-				//while (!disp_input.is_closed() && !disp_output.is_closed()
-				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				//	disp_input.wait(1);
-				//	disp_output.wait(1);
-				//}
 			}
 
 		}
