@@ -67,11 +67,6 @@ kernel void C_histogram(global  uint* A) {
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}
 
-	// prevents 0 values from effecting stride
-	if(id == 0){
-		A[n-1] = 0;
-	}
-
 	// syncs memeory
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
@@ -152,7 +147,7 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 		new_intensity = hist[in_intensity -1];
 	}
 
-	out[id] = new_intensity;
+	out[id] = hist[in_intensity];
 }
 
 

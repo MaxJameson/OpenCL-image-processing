@@ -190,8 +190,13 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
 			
 		}
+		std::cout << "Base Histogram" << endl;
+		std::cout << "Bin: " << 0 << " intensity: " << histogramData[0] << endl;
+		std::cout << "Bin: " << 1 << " intensity: " << histogramData[0] << endl;
+		std::cout << "Bin: " << 254 << " intensity: " << histogramData[254] << endl;
+		std::cout << "Bin: " << 255 << " intensity: " << histogramData[255] << endl;
 		//for (int i = 0; i < histogramData.size(); i++) {
-			//std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
+		//	std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
 		//}
 
 		std::cout << "" << endl;
@@ -253,11 +258,20 @@ int main(int argc, char **argv) {
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 		}
-		std::cout << "" << endl;
+;
 
+		std::cout << "Cumulative Histogram" << endl;
+		//std::cout << "Bin: " << 0 << " intensity: " << CumulativeHistogramData[0] << endl;
+		//std::cout << "Bin: " << 1 << " intensity: " << CumulativeHistogramData[0] << endl;
+		//std::cout << "Bin: " << 254 << " intensity: " << CumulativeHistogramData[254] << endl;
+		//std::cout << "Bin: " << 255 << " intensity: " << CumulativeHistogramData[255] << endl;
 		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
 			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
 		}
+
+		std::cout << "" << endl;
+
+
 
 		////////////////////////////////////////////////////////
 		/////////////// Max and Min numbers
@@ -307,9 +321,10 @@ int main(int argc, char **argv) {
 			}
 		}
 
+
+		std::cout << "Min: " << minNum << endl;
+		std::cout << "Max: " << maxNum << endl;
 		std::cout << "" << endl;
-		std::cout << "Min" << minNum << endl;
-		std::cout << "Max" << maxNum << endl;
 
 		// reduces size of numbers to prevent overflow
 		minNum = minNum / 10;
@@ -377,6 +392,12 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 			
 		}
+
+		std::cout << "Normalised Histogram" << endl;
+		std::cout << "Bin: " << 0 << " intensity: " << NormalisedHistogramData[0] << endl;
+		std::cout << "Bin: " << 1 << " intensity: " << NormalisedHistogramData[0] << endl;
+		std::cout << "Bin: " << 254 << " intensity: " << NormalisedHistogramData[254] << endl;
+		std::cout << "Bin: " << 255 << " intensity: " << NormalisedHistogramData[255] << endl;
 		std::cout << "" << endl;
 
 
