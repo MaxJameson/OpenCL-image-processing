@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <chrono>
+#include <algorithm>
 
 #include "Utils.h"
 #include "CImg.h"
@@ -156,8 +158,11 @@ int main(int argc, char **argv) {
 		cout << "Invalid options will run default option" << endl;
 		cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
 		cin >> histType; // Get user input from the keyboard
+
 		if (histType == "S" || histType == "s") {
 
+			// Get starting timepoint
+			auto start = std::chrono::high_resolution_clock::now();
 			// runs serial histogram
 			for (int i = 0; i < pixels.size(); i++) {
 
@@ -170,6 +175,10 @@ int main(int argc, char **argv) {
 				// Increments bin
 				histogramData[location]++;
 			}
+			// Get ending timepoint
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+			std::cout << "Serial histogram took " << duration.count() << " MS" << endl;
 		}
 		else {
 			// runs parallel histogram
@@ -192,7 +201,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
 			
 		}
-		std::cout << "Base Histogram" << endl;
+
 		ofstream histFile;
 		histFile.open("Base_Histogram.csv");
 		for (int i = 0; i < histogramData.size(); i++) {
@@ -239,6 +248,9 @@ int main(int argc, char **argv) {
 		else if (scanType == "S" || scanType == "s") {
 			std::cout << "Serial selected" << endl;
 
+			// Get starting timepoint
+			auto start = std::chrono::high_resolution_clock::now();
+
 			// runs serial can
 			for (int i = 1; i < histogramData.size(); i++) {
 
@@ -247,6 +259,11 @@ int main(int argc, char **argv) {
 			}
 			// stores data in new vector
 			CumulativeHistogramData = histogramData;
+
+			// Get ending timepoint
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+			std::cout << "Serial scan took " << duration.count() << " MS" << endl;
 		}
 		else{
 
@@ -262,7 +279,6 @@ int main(int argc, char **argv) {
 		}
 ;
 
-		std::cout << "Cumulative Histogram" << endl;
 		ofstream CumulativeHistFile;
 		CumulativeHistFile.open("Cumulative_Histogram.csv");
 		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
@@ -315,6 +331,10 @@ int main(int argc, char **argv) {
 
 			// runs serial reduce
 			std::cout << "Serial selected" << endl;
+
+			// Get starting timepoint
+			auto start = std::chrono::high_resolution_clock::now();
+
 			for (int i = 1; i < CumulativeHistogramData.size(); i++) {
 
 				// checks if current entry is smaller then what is stored in minNum
@@ -322,11 +342,13 @@ int main(int argc, char **argv) {
 					minNum = CumulativeHistogramData[i];
 				}
 			}
+
+			// Get ending timepoint
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+			std::cout << "Serial reduce took " << duration.count() << " MS" << endl;
 		}
 
-
-		std::cout << "Min: " << minNum << endl;
-		std::cout << "Max: " << maxNum << endl;
 		std::cout << "" << endl;
 
 		// reduces size of numbers to prevent overflow
@@ -350,6 +372,10 @@ int main(int argc, char **argv) {
 
 			// runs serial normalisation
 			std::cout << "Serial selected" << endl;
+
+			// Get starting timepoint
+			auto start = std::chrono::high_resolution_clock::now();
+
 			for (int i = 0; i < CumulativeHistogramData.size(); i++) {
 
 				// reduce size of value to prevent overflow
@@ -371,6 +397,11 @@ int main(int argc, char **argv) {
 					NormalisedHistogramData[i] = normalised * 255;
 				}
 			}
+
+			// Get ending timepoint
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+			std::cout << "Serial normalise took " << duration.count() << " MS" << endl;
 
 		}
 		else {
@@ -395,8 +426,6 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 			
 		}
-
-		std::cout << "Normalised Histogram" << endl;
 
 		ofstream NormalisedHistFile;
 		NormalisedHistFile.open("Normalised_Histogram.csv");
@@ -425,6 +454,9 @@ int main(int argc, char **argv) {
 		cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; // Type a number and press enter
 		cin >> eqType; // Get user input from the keyboard
 		if (eqType == "S" || eqType == "s") {
+
+			// Get starting timepoint
+			auto start = std::chrono::high_resolution_clock::now();
 			
 			for (int i = 0; i < pixels.size(); i++) {
 				// calculates bin location
@@ -444,7 +476,11 @@ int main(int argc, char **argv) {
 				output_buffer = temp_output_buffer;
 
 			}
-		
+			
+			// Get ending timepoint
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+			std::cout << "Serial equalise took " << duration.count() << " MS" << endl;
 
 		}
 		else {
