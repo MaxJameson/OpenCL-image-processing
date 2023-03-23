@@ -152,6 +152,7 @@ int main(int argc, char **argv) {
 
 		// Asked user to choose histogram type
 		string histType;
+		cout << "Invalid options will run default option" << endl;
 		cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
 		cin >> histType; // Get user input from the keyboard
 		if (histType == "S" || histType == "s") {
@@ -409,64 +410,139 @@ int main(int argc, char **argv) {
 		////////////////////////////////////////////////////////
 		/////////////// Image equalisation
 		////////////////////////////////////////////////////////
-
-		// creates and writes buffer for normalised histogram and output image
-		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
-		cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size()); //should be the same as input image
-		queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
-
-		// sets up kernel for back propogation and passes arguments
-		cl::Kernel kernel = cl::Kernel(program, "equalise");
-		kernel.setArg(0, dev_image_input);
-		kernel.setArg(1, dev_image_output);
-		kernel.setArg(2, BPhistogramBuffer);
-		kernel.setArg(3, binDiv);
-
-		// runs kernel
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange);
+		
 
 		// creates vector to store equalisation results
 		vector<unsigned char> output_buffer(image_input.size());
+		// creates vector to store equalisation results
+		vector<unsigned char> temp_output_buffer(pixels.size());
+		// asks user to choose normalisation method
+		string eqType;
+		cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; // Type a number and press enter
+		cin >> eqType; // Get user input from the keyboard
+		if (eqType == "S" || eqType == "s") {
+			
+			for (int i = 0; i < pixels.size(); i++) {
+				// calculates bin location
+				int in_intensity = int(pixels[i]) / binsDivider;
+				int new_intensity = 0;
 
-		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
-
-			// creates vector to store equalisation results
-			vector<unsigned char> output_Colour_buffer(pixels.size());
-			// reads results from buffer
-			queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_Colour_buffer.size(), &output_Colour_buffer.data()[0]);
-			output_Colour_buffer.insert(end(output_Colour_buffer), begin(intenEnd), end(intenEnd));
-			output_buffer.assign(output_Colour_buffer.begin(), output_Colour_buffer.end());
-
-			// displays input and output images to users
-			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-			output_image = output_image.YCbCrtoRGB();
-			image_input = image_input.YCbCrtoRGB();
-			CImgDisplay disp_input(image_input, "input");
-			CImgDisplay disp_output(output_image, "output");
-
-			while (!disp_input.is_closed() && !disp_output.is_closed()
-				&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				disp_input.wait(1);
-				disp_output.wait(1);
+				// gets intensity
+				temp_output_buffer[i] = unsigned char(NormalisedHistogramData[in_intensity]);
 			}
+
+			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
+				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
+				// displays input and output images to users
+				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+				//output_image = output_image.YCbCrtoRGB();
+				//image_input = image_input.YCbCrtoRGB();
+				//CImgDisplay disp_input(image_input, "input");
+				//CImgDisplay disp_output(output_image, "output");
+
+				//while (!disp_input.is_closed() && !disp_output.is_closed()
+				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				//	disp_input.wait(1);
+				//	disp_output.wait(1);
+				//}
+			}
+			else {
+				output_buffer = temp_output_buffer;
+				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+				//CImgDisplay disp_input(image_input, "input");
+				//CImgDisplay disp_output(output_image, "output");
+
+				//while (!disp_input.is_closed() && !disp_output.is_closed()
+				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				//	disp_input.wait(1);
+				//	disp_output.wait(1);
+				//}
+			}
+		
 
 		}
 		else {
+			// runs parallel equalisation
+			std::cout << "Parallel selected" << endl;
+			// creates and writes buffer for normalised histogram and output image
+			cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
+			cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size()); //should be the same as input image
+			queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
 
-			// reads results from buffer
-			queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
 
-			// displays input and output images to users
-			CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
-			CImgDisplay disp_input(image_input, "input");
-			CImgDisplay disp_output(output_image, "output");
 
-			while (!disp_input.is_closed() && !disp_output.is_closed()
-				&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-				disp_input.wait(1);
-				disp_output.wait(1);
+			// sets up kernel for back propogation and passes arguments
+			cl::Kernel kernel = cl::Kernel(program, "equalise");
+			kernel.setArg(0, dev_image_input);
+			kernel.setArg(1, dev_image_output);
+			kernel.setArg(2, BPhistogramBuffer);
+			kernel.setArg(3, binDiv);
+
+			// runs kernel
+			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange);
+
+
+
+			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+
+				// reads results from buffer
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, temp_output_buffer.size(), &temp_output_buffer.data()[0]);
+				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
+				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
+
+				//// displays input and output images to users
+				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+				//output_image = output_image.YCbCrtoRGB();
+				//image_input = image_input.YCbCrtoRGB();
+				//CImgDisplay disp_input(image_input, "input");
+				//CImgDisplay disp_output(output_image, "output");
+
+				//while (!disp_input.is_closed() && !disp_output.is_closed()
+				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				//	disp_input.wait(1);
+				//	disp_output.wait(1);
+				//}
+
 			}
+			else {
+
+				// reads results from buffer
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
+
+				//// displays input and output images to users
+				//CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+				//CImgDisplay disp_input(image_input, "input");
+				//CImgDisplay disp_output(output_image, "output");
+
+				//while (!disp_input.is_closed() && !disp_output.is_closed()
+				//	&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				//	disp_input.wait(1);
+				//	disp_output.wait(1);
+				//}
+			}
+
 		}
+
+
+		// displays input and output images to users
+		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+
+		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+			output_image = output_image.YCbCrtoRGB();
+			image_input = image_input.YCbCrtoRGB();
+		}
+
+		CImgDisplay disp_input(image_input, "input");
+		CImgDisplay disp_output(output_image, "output");
+
+		while (!disp_input.is_closed() && !disp_output.is_closed()
+			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+			disp_input.wait(1);
+			disp_output.wait(1);
+		}
+
+
 	}
 	catch (const cl::Error& err) {
 		std::cerr << "ERROR: " << err.what() << ", " << getErrorString(err.err()) << std::endl;

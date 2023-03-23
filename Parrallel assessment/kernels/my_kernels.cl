@@ -60,18 +60,19 @@ kernel void C_histogram(global  uint* A) {
 
 			// passes values forward
 			A[id] += A[id - stride];
-
-
 		}
 		// syncs memeory
 		barrier(CLK_GLOBAL_MEM_FENCE);
 	}
 
-	// syncs memeory
+	// runs downsweep on vector
+	if (id == 0){
+		A[n-1] = 0;
+	}
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
-	// runs downsweep on vector
-	for (int stride = n/2; stride > 0; stride /=2){
+
+	for (int stride = n/2; stride > 0; stride /= 2){
 		if(((id+1) % (stride*2)) == 0){
 
 			// passes values forward
@@ -137,16 +138,8 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 	int id = get_global_id(0);
 	// calculates bin location
 	int in_intensity = in[id] / *binsDivider;
-	int new_intensity = 0;
 
 	// gets intensity
-	if(id == 0){
-		new_intensity = hist[in_intensity + 1];
-	}
-	else{
-		new_intensity = hist[in_intensity -1];
-	}
-
 	out[id] = hist[in_intensity];
 }
 
