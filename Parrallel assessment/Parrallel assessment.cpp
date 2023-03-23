@@ -18,7 +18,6 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
-	//Part 1 - handle command line options such as device selection, verbosity, etc.
 	int platform_id = 0;
 	int device_id = 0;
 	string image_filename = "test.pgm";
@@ -40,23 +39,8 @@ int main(int argc, char **argv) {
 
 		CImg<unsigned char> image_input(image_filename.c_str());
 
-		std::vector<unsigned char> pixels;
-		std::vector<unsigned char> ColourEnd;
 
-		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
-			image_input = image_input.RGBtoYCbCr();
-			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
-			ColourEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
-			
-		}
-		else {
-			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
-		}
-
-		std::cout << pixels.size();
 	
-		//Part 3 - host operations
-		//3.1 Select computing devices
 		cl::Context context = GetContext(platform_id, device_id);
 
 		//display the selected device
@@ -65,7 +49,6 @@ int main(int argc, char **argv) {
 		//create a queue to which we will push commands for the device
 		cl::CommandQueue queue(context);
 
-		//3.2 Load & build the device code
 		cl::Program::Sources sources;
 
 		AddSources(sources, "kernels/my_kernels.cl");
@@ -85,14 +68,49 @@ int main(int argc, char **argv) {
 
 		std::cout << "" << endl;
 
+		////////////////////////////////////////////////////////
+		/////////////// Image and bin formatting
+		////////////////////////////////////////////////////////
+
+		// create a vector to store pixels
+		std::vector<unsigned char> pixels;
+		// stores end of intensity values for colour images
+		std::vector<unsigned char> intenEnd;
+
+		// checks if the image is colour of greysacel
+		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+
+			// converts colour space
+			image_input = image_input.RGBtoYCbCr();
+
+			// creates vector of intensity values and vector of chroma red + blue
+			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
+			intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
+
+		}
+		else {
+
+			// creates vector of greyscale intensities
+			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
+		}
+
+		// stores bool to check if the value of bins is valid
 		bool binCheck = false;
+		// stores number of bins
 		unsigned int bins;
+		// stores number of bits per pixel
 		unsigned int bits = 256;
+		// stores valid to calculate which bin a pixel belongs too
 		unsigned int binsDivider;
+
+		// loops until a valid bin is input
 		while (!binCheck) {
+
+			// takes input for bin
 			cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
 			cin >> bins; // Get user input from the keyboard
 
+			// checsk if input is valid
 			if (bins < 32 || bins > 257) {
 				std::cout << "Invalid input " << endl;
 				cin.clear();
@@ -100,6 +118,8 @@ int main(int argc, char **argv) {
 			}
 			else {
 				binCheck = true;
+
+				// calculates the number used to define which bin and intensity belongs too
 				if (bins = bits) {
 					binsDivider = 1;
 				}
@@ -112,192 +132,232 @@ int main(int argc, char **argv) {
 
 		std::cout << "" << endl;
 
+
+		////////////////////////////////////////////////////////
+		/////////////// Create base histogram
+		////////////////////////////////////////////////////////
+
 		// creates vector to store output
 		std::vector<unsigned int> histogramData(bins);
+
+		// creates buffer for bin calculator and the input image - buffers used in more than one Kernel
 		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
+		// write previous two buffers to the memory buffer - buffers used in more than one Kernel
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0]);
 		queue.enqueueWriteBuffer(binDiv, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
+
+		// stores the images size
 		int imageSize = image_input.size();
+
+		// Asked user to choose histogram type
 		string histType;
 		cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
 		cin >> histType; // Get user input from the keyboard
 		if (histType == "S" || histType == "s") {
+
+			// runs serial histogram
 			for (int i = 0; i < pixels.size(); i++) {
-				// gets the intensity value from the image
+
+
+				// Calculates bin location
 				const int pixel = pixels[i];
 				float bin = pixel / binsDivider;
 				int location = round(bin);
 
-				// uses an atomic function to increment the current intensity
+				// Increments bin
 				histogramData[location]++;
 			}
 		}
 		else {
-			// creates and writes buffers for input image and histogram data
+			// runs parallel histogram
 
+			// creates bugger for the histogram
 			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			cl::Buffer size(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-
-
-			queue.enqueueWriteBuffer(size, CL_TRUE, 0, sizeof(unsigned int), &imageSize, NULL);
-
+			//cl::Buffer size(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+			//queue.enqueueWriteBuffer(size, CL_TRUE, 0, sizeof(unsigned int), &imageSize, NULL);
 			// creates kernel and sets argumements
 			cl::Kernel histogramKernel(program, "histogram");
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
-			histogramKernel.setArg(3, size);
+			//histogramKernel.setArg(3, size);
 			// local memory argument
 			//histogramKernel.setArg(4, bins * sizeof(unsigned int), NULL);
-
 			// runs kernel
 			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
-
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
 			
 		}
-
-		std::cout << "" << endl;
-
-		/////////////// Create base histogram - histogram kernel
-
-
-
-
-
 		//for (int i = 0; i < histogramData.size(); i++) {
 			//std::cout << "Bin: " << i << " intensity: " << histogramData[i] << endl;
 		//}
 
+		std::cout << "" << endl;
+
+
+		////////////////////////////////////////////////////////
 		/////////////// Create cumulative histogram
+		////////////////////////////////////////////////////////
+
 		// creates vector to store output
 		std::vector<unsigned int> CumulativeHistogramData(bins);
+
+		// creates and writes buffer for parallel kernel histogram data
+		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
+
+		// asks user to choose scan type
 		string scanType;
 		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch(Default) S = Serial: "; // Type a number and press enter
 		cin >> scanType; // Get user input from the keyboard
 		if (scanType == "H" || scanType == "h") {
 
 
-			/////////////// Hillis-Steele
+			/////////////// Runs Hillis-Steele
 			std::cout << "Hillis-Steele selected" << endl;
-			// creates and writes buffer for histogram data
-			cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+			// creates and writes buffer for input and ouput histograms
 			cl::Buffer OuthistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
-
 			// sets up kernel for cumulative histogram histogram and passes arguments
 			cl::Kernel C_histogramKernel(program, "C_histogramhs");
 			C_histogramKernel.setArg(0, ChistogramBuffer);
 			C_histogramKernel.setArg(1, OuthistogramBuffer);
-
 			// runs kernel
 			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
-
-
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+
 		}
 		else if (scanType == "S" || scanType == "s") {
 			std::cout << "Serial selected" << endl;
+
+			// runs serial can
 			for (int i = 1; i < histogramData.size(); i++) {
+
+				// adds current record to previous record
 				histogramData[i] += histogramData[i-1];
 			}
+			// stores data in new vector
 			CumulativeHistogramData = histogramData;
 		}
 		else{
-			std::cout << "Blelloch selected" << endl;
-			// creates and writes buffer for histogram data
-			cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
 
+			// runs Blelloch
+			std::cout << "Blelloch selected" << endl;
 			// sets up kernel for cumulative histogram histogram and passes arguments
 			cl::Kernel C_histogramKernel(program, "C_histogram");
 			C_histogramKernel.setArg(0, ChistogramBuffer);
-
 			// runs kernel
 			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
-
-
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
 		}
 		std::cout << "" << endl;
 
+		for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+			std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
+		}
 
+		////////////////////////////////////////////////////////
+		/////////////// Max and Min numbers
+		////////////////////////////////////////////////////////
 
-
-		//for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
-		//}
-
-		/////////////// Create normalised histogram - Map
+		// stores end number from cumulative scan as max num
 		unsigned int maxNum = CumulativeHistogramData.back();
+		// stors maxNum to use for finding minium
 		unsigned int minNum = maxNum;
+
+		// asks user to choose method for finding minum number
 		string minType;
 		cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial (Default) P = Parallel: "; // Type a number and press enter
 		cin >> minType; // Get user input from the keyboard
 		if (minType == "P" || minType == "p") {
+
+			// runs parallel reduce
+
+			// creates and writes buffer to store output data
 			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
 
 			// sets up kernel for normalisation and passes arguments
 			cl::Kernel reduce(program, "reduce");
 			reduce.setArg(0, NhistogramBuffer);
-			// creates vector to store histogram results
+			// creates vector to store results
+			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
 			std::vector<unsigned int> minStorage(bins);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
 
-
+			// stores stat of array as minimum number
 			minNum = CumulativeHistogramData[0];
 
 		
 		}
 		else {
+
+			// runs serial reduce
 			std::cout << "Serial selected" << endl;
 			for (int i = 1; i < CumulativeHistogramData.size(); i++) {
+
+				// checks if current entry is smaller then what is stored in minNum
 				if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
 					minNum = CumulativeHistogramData[i];
 				}
 			}
 		}
-		//for (int i = 0; i < CumulativeHistogramData.size(); i++) {
-			//std::cout << "Bin: " << i << " intensity: " << CumulativeHistogramData[i] << endl;
-		//}
-		std::cout << "" << endl;
-		std::cout << minNum << endl;
-		std::cout << maxNum << endl;
 
+		std::cout << "" << endl;
+		std::cout << "Min" << minNum << endl;
+		std::cout << "Max" << maxNum << endl;
+
+		// reduces size of numbers to prevent overflow
 		minNum = minNum / 10;
 		maxNum = maxNum / 10;
+
+
+
+		////////////////////////////////////////////////////////
+		/////////////// Histogram normalisaiton
+		////////////////////////////////////////////////////////
+
 		// creates vector to store histogram results
 		std::vector<unsigned int> NormalisedHistogramData(bins);
+
+		// asks user to choose normalisation method
 		string normType;
-		cout << "Please select which scan method you would like to use to normalise the histogram. S = Serial P = Parallel: "; // Type a number and press enter
+		cout << "Please select which scan method you would like to use to normalise the histogram. S = Serial P = Parallel(Default): "; // Type a number and press enter
 		cin >> normType; // Get user input from the keyboard
 		if (normType == "S" || normType == "s") {
+
+			// runs serial normalisation
 			std::cout << "Serial selected" << endl;
 			for (int i = 0; i < CumulativeHistogramData.size(); i++) {
+
+				// reduce size of value to prevent overflow
 				int currentValue = CumulativeHistogramData[i] / 10;
+
+				// stores 0-1 normalisation
 				double minScale = 0;
 				double maxScale = 1;
 				double normalised;
+
 				if (i == 0 || CumulativeHistogramData[i] == 0) {
+					// prevents need to calculate 0 count entries
 					CumulativeHistogramData[i] = 0;
 				}
 				else {
+					// normlises entry between 0 - 1
 					normalised = minScale + (currentValue - minNum) * (maxScale - minScale) / (maxNum - minNum);
+					// scales normalistion to 0 - 256
 					NormalisedHistogramData[i] = normalised * 255;
 				}
 			}
 
 		}
 		else {
-			if (normType == "P" || normType == "p") {
-				std::cout << "Invalid selection, Default = Parallel" << endl;
-			}
+
+			// runs parallel nromalosation
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffers for min value, max value and normalised histogram
 			cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
@@ -306,17 +366,13 @@ int main(int argc, char **argv) {
 			queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL);
 			queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL);
 			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
-
 			// sets up kernel for normalisation and passes arguments
 			cl::Kernel N_histogramKernel(program, "N_histogram");
 			N_histogramKernel.setArg(0, NhistogramBuffer);
 			N_histogramKernel.setArg(1, minNumBuffer);
 			N_histogramKernel.setArg(2, maxNumBuffer);
-
 			// runs histogram kernel
 			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
-
-
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
 			
@@ -329,7 +385,9 @@ int main(int argc, char **argv) {
 		//}
 
 
-		/////////////// Equalise Image - Map
+		////////////////////////////////////////////////////////
+		/////////////// Image equalisation
+		////////////////////////////////////////////////////////
 
 		// creates and writes buffer for normalised histogram and output image
 		cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
@@ -355,7 +413,7 @@ int main(int argc, char **argv) {
 			vector<unsigned char> output_Colour_buffer(pixels.size());
 			// reads results from buffer
 			queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_Colour_buffer.size(), &output_Colour_buffer.data()[0]);
-			output_Colour_buffer.insert(end(output_Colour_buffer), begin(ColourEnd), end(ColourEnd));
+			output_Colour_buffer.insert(end(output_Colour_buffer), begin(intenEnd), end(intenEnd));
 			output_buffer.assign(output_Colour_buffer.begin(), output_Colour_buffer.end());
 
 			// displays input and output images to users
