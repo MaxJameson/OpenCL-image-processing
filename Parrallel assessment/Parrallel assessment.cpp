@@ -47,20 +47,13 @@ int main(int argc, char **argv) {
 			image_input = image_input.RGBtoYCbCr();
 			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
 			ColourEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
-			std::cout << &image_input << endl;
 			
 		}
 		else {
 			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
 		}
 
-		//for (int i = 0; i < pixels.size(); i++) {
-		//	if (int(pixels[i]) == 256);
-		//	{
-		//		std::cout << "Hi" << endl;
-		//	}
-		//}
-
+		std::cout << pixels.size();
 	
 		//Part 3 - host operations
 		//3.1 Select computing devices

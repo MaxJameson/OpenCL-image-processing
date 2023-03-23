@@ -10,9 +10,12 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 	const uchar pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
 	int location = round(bin);
+	if(location != 0){
+	
+		// uses an atomic function to increment the current intensity
+		atomic_inc(&H[location]);
+	}
 
-	// uses an atomic function to increment the current intensity
-	atomic_inc(&H[location]);
 }
 
 kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider, global uint* size,local uint* LocalMem) {
