@@ -103,7 +103,7 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	}
 	else{
 		normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
-		A[id] = normalised * 255;
+		A[id] = normalised * 256;
 	}
 
 
