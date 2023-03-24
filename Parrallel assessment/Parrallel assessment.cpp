@@ -21,6 +21,9 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
+
+	// Get starting timepoint
+	auto Mainstart = std::chrono::high_resolution_clock::now();
 	int platform_id = 0;
 	int device_id = 0;
 	string image_filename = "test.pgm";
@@ -228,6 +231,8 @@ int main(int argc, char **argv) {
 		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
 
+		cl::Event ScanEvent;
+
 		// asks user to choose scan type
 		string scanType;
 		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch(Default) S = Serial: "; // Type a number and press enter
@@ -244,9 +249,12 @@ int main(int argc, char **argv) {
 			C_histogramKernel.setArg(0, ChistogramBuffer);
 			C_histogramKernel.setArg(1, OuthistogramBuffer);
 			// runs kernel
-			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+
+			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
 
 		}
 		else if (scanType == "S" || scanType == "s") {
@@ -277,9 +285,12 @@ int main(int argc, char **argv) {
 			cl::Kernel C_histogramKernel(program, "C_histogram");
 			C_histogramKernel.setArg(0, ChistogramBuffer);
 			// runs kernel
-			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+
+			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
 		}
 ;
 
@@ -314,6 +325,10 @@ int main(int argc, char **argv) {
 		if (minType == "P" || minType == "p") {
 
 			// runs parallel reduce
+			std::cout << "Parallel selected" << endl;
+
+			// runs parallel reduce
+			cl::Event MinEvent;
 
 			// creates and writes buffer to store output data
 			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
@@ -323,10 +338,13 @@ int main(int argc, char **argv) {
 			cl::Kernel reduce(program, "reduce");
 			reduce.setArg(0, NhistogramBuffer);
 			// creates vector to store results
-			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &MinEvent);
 			std::vector<unsigned int> minStorage(bins);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
+
+			std::cout << "Kernel execution time [ns]:" << MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(MinEvent, ProfilingResolution::PROF_US) << std::endl;
 
 			// stores stat of array as minimum number
 			minNum = minStorage[0];
@@ -417,6 +435,7 @@ int main(int argc, char **argv) {
 		}
 		else {
 
+			cl::Event NormEvent;
 			// runs parallel nromalosation
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffers for min value, max value and normalised histogram
@@ -432,9 +451,12 @@ int main(int argc, char **argv) {
 			N_histogramKernel.setArg(1, minNumBuffer);
 			N_histogramKernel.setArg(2, maxNumBuffer);
 			// runs histogram kernel
-			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &NormEvent);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
+
+			std::cout << "Kernel execution time [ns]:" << NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(NormEvent, ProfilingResolution::PROF_US) << std::endl;
 			
 		}
 
@@ -495,6 +517,8 @@ int main(int argc, char **argv) {
 
 		}
 		else {
+
+			cl::Event EqEvent;
 			// runs parallel equalisation
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffer for normalised histogram and output image
@@ -512,7 +536,7 @@ int main(int argc, char **argv) {
 			kernel.setArg(3, binDiv);
 
 			// runs kernel
-			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange, NULL, &EqEvent);
 
 
 
@@ -533,6 +557,9 @@ int main(int argc, char **argv) {
 
 			}
 
+			std::cout << "Kernel execution time [ns]:" << EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(EqEvent, ProfilingResolution::PROF_US) << std::endl;
+
 		}
 
 
@@ -546,6 +573,9 @@ int main(int argc, char **argv) {
 
 		CImgDisplay disp_input(image_input, "input");
 		CImgDisplay disp_output(output_image, "output");
+		auto Mainstop = std::chrono::high_resolution_clock::now();
+		auto Mainduration = std::chrono::duration_cast<std::chrono::microseconds>(Mainstop - Mainstart);
+		std::cout << "Overall execution time: " << Mainduration.count() << " MS" << endl;
 
 		while (!disp_input.is_closed() && !disp_output.is_closed()
 			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
