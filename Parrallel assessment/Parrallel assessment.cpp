@@ -343,10 +343,12 @@ int main(int argc, char **argv) {
 
 			// runs parallel reduce
 			cl::Event MinEvent;
+			cl::Event MinInEvent;
+			cl::Event MinOutEvent;
 
 			// creates and writes buffer to store output data
 			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
+			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL, &MinInEvent);
 
 			// sets up kernel for normalisation and passes arguments
 			cl::Kernel reduce(program, "reduce");
@@ -355,10 +357,12 @@ int main(int argc, char **argv) {
 			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &MinEvent);
 			std::vector<unsigned int> minStorage(bins);
 			// reads results from buffer
-			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
+			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(MinEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Input min transfer time [ns]:" << MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output min transfer time [ns]:" << MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
 			// stores stat of array as minimum number
 			minNum = minStorage[0];
@@ -450,15 +454,20 @@ int main(int argc, char **argv) {
 		else {
 
 			cl::Event NormEvent;
+			cl::Event NormMinEvent;
+			cl::Event NormMaxEvent;
+			cl::Event NormInEvent;
+			cl::Event NormOutEvent;
+
 			// runs parallel nromalosation
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffers for min value, max value and normalised histogram
+			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 			cl::Buffer maxNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL);
-			queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL);
-			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL);
+			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL, &NormInEvent);
+			queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL, &NormMinEvent);
+			queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL, &NormMaxEvent);
 			// sets up kernel for normalisation and passes arguments
 			cl::Kernel N_histogramKernel(program, "N_histogram");
 			N_histogramKernel.setArg(0, NhistogramBuffer);
@@ -467,10 +476,14 @@ int main(int argc, char **argv) {
 			// runs histogram kernel
 			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &NormEvent);
 			// reads results from buffer
-			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data());
+			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(NormEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Min transfer time [ns]:" << NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Max transfer time [ns]:" << NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Input histogram transfer time [ns]:" << NormInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output histogram transfer time [ns]:" << NormOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			
 		}
 
@@ -533,12 +546,14 @@ int main(int argc, char **argv) {
 		else {
 
 			cl::Event EqEvent;
+			cl::Event EqInEvent;
+			cl::Event EqOutEvent;
 			// runs parallel equalisation
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffer for normalised histogram and output image
 			cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
 			cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size()); //should be the same as input image
-			queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL);
+			queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL, &EqInEvent);
 
 
 
@@ -557,7 +572,7 @@ int main(int argc, char **argv) {
 			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 
 				// reads results from buffer
-				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, temp_output_buffer.size(), &temp_output_buffer.data()[0]);
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, temp_output_buffer.size(), &temp_output_buffer.data()[0], NULL, &EqOutEvent);
 				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
 				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
 
@@ -567,12 +582,16 @@ int main(int argc, char **argv) {
 			else {
 
 				// reads results from buffer
-				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0]);
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0], NULL, &EqOutEvent);
 
 			}
 
 			std::cout << "Kernel execution time [ns]:" << EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(EqEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Input image already stored in buffer" << endl;
+			std::cout << "bin divider already stored in buffer" << endl;
+			std::cout << "Input histogram transfer time [ns]:" << EqInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output Image transfer time [ns]:" << EqOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
 		}
 
