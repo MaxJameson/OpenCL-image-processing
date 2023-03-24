@@ -9,7 +9,7 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 	// gets the intensity value from the image and calculates it's bin
 	const uchar pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
-	int location = round(bin);
+	uint location = round(bin);
 
 	// prevents issues with 0 values diplicating to size of the image
 	if(location != 0){
@@ -126,8 +126,8 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 	else{
 		// normlises entry between 0 - 1
 		normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
-		// scales normalistion to 0 - 256
-		A[id] = normalised * 256;
+		// scales normalistion to 0 - 255
+		A[id] = normalised * 255;
 	}
 
 
@@ -138,9 +138,15 @@ kernel void equalise( global uchar* in, global uchar* out,global uint* hist, glo
 	int id = get_global_id(0);
 	// calculates bin location
 	int in_intensity = in[id] / *binsDivider;
+	if(id == get_global_size(0)){
+		// gets intensity
+		out[id] = hist[in_intensity];
+	}
+	else{
+		// gets intensity
+		out[id] = hist[in_intensity + 1];
+	}
 
-	// gets intensity
-	out[id] = hist[in_intensity];
 }
 
 
@@ -152,7 +158,7 @@ kernel void reduce(global uint* A){
 	for(int stride=1; stride<N; stride*=2){
 		// stores minimum value
 		if((id % (stride*2)) == 0){
-			if(A[id] < A[id+stride] && A[id+stride] != 0){
+			if(A[id] > A[id+stride] || A[id] == 0){
 				A[id] = A[id+stride];
 			}
 		}

@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 		std::cout << "Runing on " << GetPlatformName(platform_id) << ", " << GetDeviceName(platform_id, device_id) << std::endl;
 
 		//create a queue to which we will push commands for the device
-		cl::CommandQueue queue(context);
+		cl::CommandQueue queue(context, CL_QUEUE_PROFILING_ENABLE);
 
 		cl::Program::Sources sources;
 
@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
 			cin >> bins; // Get user input from the keyboard
 
 			// checsk if input is valid
-			if (bins < 32 || bins > 257) {
+			if (bins < 32 || bins > 256) {
 				std::cout << "Invalid input " << endl;
 				cin.clear();
 				cin.ignore(1, '\n');
@@ -183,6 +183,7 @@ int main(int argc, char **argv) {
 		else {
 			// runs parallel histogram
 
+			cl::Event HistEvent;
 			// creates bugger for the histogram
 			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			//cl::Buffer size(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
@@ -196,9 +197,12 @@ int main(int argc, char **argv) {
 			// local memory argument
 			//histogramKernel.setArg(4, bins * sizeof(unsigned int), NULL);
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange);
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange, NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
+
+			std::cout << "Kernel execution time [ns]:" << HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << GetFullProfilingInfo(HistEvent, ProfilingResolution::PROF_US) << std::endl;
 			
 		}
 
@@ -301,6 +305,8 @@ int main(int argc, char **argv) {
 		// stors maxNum to use for finding minium
 		unsigned int minNum = maxNum;
 
+
+
 		// asks user to choose method for finding minum number
 		string minType;
 		cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial (Default) P = Parallel: "; // Type a number and press enter
@@ -323,7 +329,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data());
 
 			// stores stat of array as minimum number
-			minNum = CumulativeHistogramData[0];
+			minNum = minStorage[0];
 
 		
 		}
@@ -334,13 +340,17 @@ int main(int argc, char **argv) {
 
 			// Get starting timepoint
 			auto start = std::chrono::high_resolution_clock::now();
+			int i = 0;
+			bool numFound = false;
 
-			for (int i = 1; i < CumulativeHistogramData.size(); i++) {
+			while (i < CumulativeHistogramData.size() && !numFound) {
 
-				// checks if current entry is smaller then what is stored in minNum
-				if (CumulativeHistogramData[i] != 0 && minNum > CumulativeHistogramData[i]) {
+				// Numbers are in cumulative order so the first non zero value will be the minimum;
+				if (CumulativeHistogramData[i] != 0) {
 					minNum = CumulativeHistogramData[i];
+					numFound = true;
 				}
+				i++;
 			}
 
 			// Get ending timepoint
@@ -350,7 +360,8 @@ int main(int argc, char **argv) {
 		}
 
 		std::cout << "" << endl;
-
+		std::cout << "Min: " << minNum << endl;
+		std::cout << "Max: " << maxNum << endl;
 		// reduces size of numbers to prevent overflow
 		minNum = minNum / 10;
 		maxNum = maxNum / 10;
