@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
 			// local memory argument
 			//histogramKernel.setArg(4, bins * sizeof(unsigned int), NULL);
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange, NULL, &HistEvent);
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NDRange(1), NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
 			C_histogramKernel.setArg(0, ChistogramBuffer);
 			C_histogramKernel.setArg(1, OuthistogramBuffer);
 			// runs kernel
-			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
+			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
 			cl::Kernel C_histogramKernel(program, "C_histogram");
 			C_histogramKernel.setArg(0, ChistogramBuffer);
 			// runs kernel
-			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
+			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
