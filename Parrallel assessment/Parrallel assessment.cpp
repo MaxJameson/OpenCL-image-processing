@@ -150,8 +150,12 @@ int main(int argc, char **argv) {
 		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
 		// write previous two buffers to the memory buffer - buffers used in more than one Kernel
-		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0]);
-		queue.enqueueWriteBuffer(binDiv, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL);
+		cl::Event inIamgeTransfer;
+		cl::Event dividerTransfer;
+		cl::Event histOut;
+
+		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0], NULL, &inIamgeTransfer);
+		queue.enqueueWriteBuffer(binDiv, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL, &dividerTransfer);
 
 		// stores the images size
 		int imageSize = image_input.size();
@@ -202,10 +206,13 @@ int main(int argc, char **argv) {
 			// runs kernel
 			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NullRange, NULL, &HistEvent);
 			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data());
+			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
 			std::cout << "Kernel execution time [ns]:" << HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(HistEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Image transfer time [ns]:" << inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "binsize transfer time [ns]:" << dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output transfer time [ns]:" << histOut.getProfilingInfo<CL_PROFILING_COMMAND_END>() - histOut.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			
 		}
 
@@ -224,14 +231,17 @@ int main(int argc, char **argv) {
 		/////////////// Create cumulative histogram
 		////////////////////////////////////////////////////////
 
+		cl::Event ScanEvent;
+		cl::Event ScanInEvent;
+		cl::Event ScanOutEvent;
 		// creates vector to store output
 		std::vector<unsigned int> CumulativeHistogramData(bins);
 
 		// creates and writes buffer for parallel kernel histogram data
 		cl::Buffer ChistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL);
+		queue.enqueueWriteBuffer(ChistogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), &histogramData[0], NULL, &ScanInEvent);
 
-		cl::Event ScanEvent;
+
 
 		// asks user to choose scan type
 		string scanType;
@@ -251,10 +261,12 @@ int main(int argc, char **argv) {
 			// runs kernel
 			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
 			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
 		}
 		else if (scanType == "S" || scanType == "s") {
@@ -287,10 +299,12 @@ int main(int argc, char **argv) {
 			// runs kernel
 			queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NullRange, NULL, &ScanEvent);
 			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data());
+			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+			std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 		}
 ;
 
