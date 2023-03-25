@@ -43,6 +43,12 @@ int main(int argc, char **argv) {
 
 		bool depthSelect = false;
 		int depth;
+		// stores number of bits per pixel
+		unsigned int bits;
+
+		CImg<unsigned char> image_input(image_filename.c_str());
+		CImg<unsigned short> image_input16(image_filename.c_str());
+		std::vector<unsigned int> intImage;
 
 		// loops until a valid bin is input
 		while(!depthSelect) {
@@ -52,9 +58,15 @@ int main(int argc, char **argv) {
 			std::cin >> depth; // Get user input from the keyboard
 
 			// checsk if input is valid
-			if (depth == 8 || depth == 16) {
+			if (depth == 8) {
 				depthSelect = true;
-				std::cout << depth << " bit selected" << endl;
+				std::cout << "8 bit selected" << endl;
+				bits = 256;
+			}
+			else if (depth == 16) {
+				depthSelect = true;
+				std::cout << "16 bit selected" << endl;
+				bits = 65536;
 			}
 			else {
 				std::cout << "Please select a valid bit depth" << endl;
@@ -64,7 +76,7 @@ int main(int argc, char **argv) {
 
 		}
 
-		CImg<unsigned char> image_input(image_filename.c_str());
+
 
 		//CImg<unsigned short> input(image_filename.c_str());
 
@@ -128,8 +140,7 @@ int main(int argc, char **argv) {
 		bool binCheck = false;
 		// stores number of bins
 		unsigned int bins;
-		// stores number of bits per pixel
-		unsigned int bits = 256;
+
 		// stores valid to calculate which bin a pixel belongs too
 		unsigned int binsDivider;
 
