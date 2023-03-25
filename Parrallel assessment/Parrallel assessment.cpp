@@ -45,8 +45,10 @@ int main(int argc, char **argv) {
 
 		CImg<unsigned char> image_input(image_filename.c_str());
 
+		//CImg<unsigned short> input(image_filename.c_str());
 
-	
+		//CImgDisplay tester(input, "output");
+
 		cl::Context context = GetContext(platform_id, device_id);
 
 		//display the selected device
@@ -89,6 +91,7 @@ int main(int argc, char **argv) {
 			// converts colour space
 			image_input = image_input.RGBtoYCbCr();
 
+
 			// creates vector of intensity values and vector of chroma red + blue
 			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
 			intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
@@ -100,6 +103,12 @@ int main(int argc, char **argv) {
 			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
 		}
 
+		//std::vector<unsigned int> test;
+		//test.assign(pixels.begin() + 0, pixels.begin() + pixels.size());
+		//for (int i = 0; i < test.size(); i++) {
+			//std::cout << test[i] << endl;
+		//}
+			 
 		// stores bool to check if the value of bins is valid
 		bool binCheck = false;
 		// stores number of bins
@@ -184,8 +193,8 @@ int main(int argc, char **argv) {
 			}
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-			std::cout << "Serial histogram took " << duration.count() << " MS" << endl;
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			std::cout << "Serial histogram took " << duration.count() << "NS" << endl;
 		}
 		else {
 			// runs parallel histogram
@@ -209,7 +218,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
 			std::cout << "Kernel execution time [ns]:" << HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(HistEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(HistEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Image transfer time [ns]:" << inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "binsize transfer time [ns]:" << dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output transfer time [ns]:" << histOut.getProfilingInfo<CL_PROFILING_COMMAND_END>() - histOut.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -264,7 +273,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
@@ -286,8 +295,8 @@ int main(int argc, char **argv) {
 
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-			std::cout << "Serial scan took " << duration.count() << " MS" << endl;
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			std::cout << "Serial scan took " << duration.count() << " NS" << endl;
 		}
 		else{
 
@@ -302,7 +311,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 		}
@@ -360,7 +369,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(MinEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(MinEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input min transfer time [ns]:" << MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output min transfer time [ns]:" << MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 
@@ -391,8 +400,8 @@ int main(int argc, char **argv) {
 
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-			std::cout << "Serial reduce took " << duration.count() << " MS" << endl;
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			std::cout << "Serial reduce took " << duration.count() << " NS" << endl;
 		}
 
 		std::cout << "" << endl;
@@ -447,8 +456,8 @@ int main(int argc, char **argv) {
 
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-			std::cout << "Serial normalise took " << duration.count() << " MS" << endl;
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			std::cout << "Serial normalise took " << duration.count() << " NS" << endl;
 
 		}
 		else {
@@ -479,7 +488,7 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
 			std::cout << "Kernel execution time [ns]:" << NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(NormEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(NormEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Min transfer time [ns]:" << NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Max transfer time [ns]:" << NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Input histogram transfer time [ns]:" << NormInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -539,8 +548,8 @@ int main(int argc, char **argv) {
 			
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-			std::cout << "Serial equalise took " << duration.count() << " MS" << endl;
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			std::cout << "Serial equalise took " << duration.count() << " NS" << endl;
 
 		}
 		else {
@@ -587,7 +596,7 @@ int main(int argc, char **argv) {
 			}
 
 			std::cout << "Kernel execution time [ns]:" << EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
-			std::cout << GetFullProfilingInfo(EqEvent, ProfilingResolution::PROF_US) << std::endl;
+			std::cout << GetFullProfilingInfo(EqEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input image already stored in buffer" << endl;
 			std::cout << "bin divider already stored in buffer" << endl;
 			std::cout << "Input histogram transfer time [ns]:" << EqInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -607,11 +616,10 @@ int main(int argc, char **argv) {
 		CImgDisplay disp_input(image_input, "input");
 		CImgDisplay disp_output(output_image, "output");
 		auto Mainstop = std::chrono::high_resolution_clock::now();
-		auto Mainduration = std::chrono::duration_cast<std::chrono::microseconds>(Mainstop - Mainstart);
-		std::cout << "Overall execution time: " << Mainduration.count() << " MS" << endl;
+		auto Mainduration = std::chrono::duration_cast<std::chrono::nanoseconds>(Mainstop - Mainstart);
+		std::cout << "Overall execution time: " << Mainduration.count() << " NS" << endl;
 
-		while (!disp_input.is_closed() && !disp_output.is_closed()
-			&& !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+		while (!disp_input.is_closed() && !disp_output.is_closed() && !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
 			disp_input.wait(1);
 			disp_output.wait(1);
 		}
