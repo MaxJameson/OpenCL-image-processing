@@ -1,13 +1,13 @@
 
 // Counts occurence of each intensity
-kernel void histogram(global const uchar* A, global uint* H, global uint* binsDivider) {
+kernel void histogram(global const uint* A, global uint* H, global uint* binsDivider) {
 	
 	// gets the current index
 	int id = get_global_id(0);
 
 
 	// gets the intensity value from the image and calculates it's bin
-	const uchar pixel = A[id];
+	uint pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
 	uint location = round(bin);
 
@@ -20,7 +20,7 @@ kernel void histogram(global const uchar* A, global uint* H, global uint* binsDi
 
 }
 
-kernel void histogram_Local(global const uchar* A, global uint* H, global uint* binsDivider, global uint* size,local uint* LocalMem) {
+kernel void histogram_Local(global const uint* A, global uint* H, global uint* binsDivider,local uint* LocalMem) {
 	// gets the current index for global and local memeory
 	int id = get_global_id(0);
 
@@ -32,7 +32,7 @@ kernel void histogram_Local(global const uchar* A, global uint* H, global uint* 
 	}
 
 	// gets the intensity value from the image
-	const uchar pixel = A[id];
+	uint pixel = A[id];
 	float bin = (uint)pixel / (*binsDivider);
 	uint location = round(bin);
 
@@ -134,7 +134,7 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 }
 
 //a simple OpenCL kernel which copies all pixels from A to B
-kernel void equalise( global uchar* in, global uchar* out,global uint* hist, global uint* binsDivider) {
+kernel void equalise( global uint* in, global uint* out,global uint* hist, global uint* binsDivider) {
 	int id = get_global_id(0);
 	// calculates bin location
 	int in_intensity = in[id] / *binsDivider;

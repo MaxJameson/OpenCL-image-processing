@@ -41,7 +41,28 @@ int main(int argc, char **argv) {
 	//detect any potential exceptions
 	try {
 
-		bool colour = false;
+		bool depthSelect = false;
+		int depth;
+
+		// loops until a valid bin is input
+		while(!depthSelect) {
+
+			// takes input for bin
+			std::cout << "Please enter the bit depth of the image: 8 or 16: "; // Type a number and press enter
+			std::cin >> depth; // Get user input from the keyboard
+
+			// checsk if input is valid
+			if (depth == 8 || depth == 16) {
+				depthSelect = true;
+				std::cout << depth << " bit selected" << endl;
+			}
+			else {
+				std::cout << "Please select a valid bit depth" << endl;
+				std::cin.clear();
+				std::cin.ignore(1, '\n');
+			}
+
+		}
 
 		CImg<unsigned char> image_input(image_filename.c_str());
 
@@ -81,9 +102,9 @@ int main(int argc, char **argv) {
 		////////////////////////////////////////////////////////
 
 		// create a vector to store pixels
-		std::vector<unsigned char> pixels;
+		std::vector<unsigned int> pixels;
 		// stores end of intensity values for colour images
-		std::vector<unsigned char> intenEnd;
+		std::vector<unsigned int> intenEnd;
 
 		// checks if the image is colour of greysacel
 		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
@@ -102,12 +123,6 @@ int main(int argc, char **argv) {
 			// creates vector of greyscale intensities
 			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
 		}
-
-		//std::vector<unsigned int> test;
-		//test.assign(pixels.begin() + 0, pixels.begin() + pixels.size());
-		//for (int i = 0; i < test.size(); i++) {
-			//std::cout << test[i] << endl;
-		//}
 			 
 		// stores bool to check if the value of bins is valid
 		bool binCheck = false;
@@ -122,14 +137,14 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 
 			// takes input for bin
-			cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
-			cin >> bins; // Get user input from the keyboard
+			std::cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
+			std::cin >> bins; // Get user input from the keyboard
 
 			// checsk if input is valid
 			if (bins < 32 || bins > 256) {
 				std::cout << "Invalid input " << endl;
-				cin.clear();
-				cin.ignore(1, '\n');
+				std::cin.clear();
+				std::cin.ignore(1, '\n');
 			}
 			else {
 				binCheck = true;
@@ -157,13 +172,13 @@ int main(int argc, char **argv) {
 
 		// creates buffer for bin calculator and the input image - buffers used in more than one Kernel
 		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, image_input.size());
+		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, pixels.size() * sizeof(unsigned int));
 		// write previous two buffers to the memory buffer - buffers used in more than one Kernel
 		cl::Event inIamgeTransfer;
 		cl::Event dividerTransfer;
 		cl::Event histOut;
 
-		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size(), &pixels[0], NULL, &inIamgeTransfer);
+		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), &pixels[0], NULL, &inIamgeTransfer);
 		queue.enqueueWriteBuffer(binDiv, CL_TRUE, 0, sizeof(unsigned int), &binsDivider, NULL, &dividerTransfer);
 
 		// stores the images size
@@ -171,9 +186,9 @@ int main(int argc, char **argv) {
 
 		// Asked user to choose histogram type
 		string histType;
-		cout << "Invalid options will run default option" << endl;
-		cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
-		cin >> histType; // Get user input from the keyboard
+		std::cout << "Invalid options will run default option" << endl;
+		std::cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
+		std::cin >> histType; // Get user input from the keyboard
 
 		if (histType == "S" || histType == "s") {
 
@@ -202,18 +217,15 @@ int main(int argc, char **argv) {
 			cl::Event HistEvent;
 			// creates bugger for the histogram
 			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			//cl::Buffer size(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-			//queue.enqueueWriteBuffer(size, CL_TRUE, 0, sizeof(unsigned int), &imageSize, NULL);
 			// creates kernel and sets argumements
 			cl::Kernel histogramKernel(program, "histogram");
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
-			//histogramKernel.setArg(3, size);
 			// local memory argument
-			//histogramKernel.setArg(4, bins * sizeof(unsigned int), NULL);
+			//histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(image_input.size()), cl::NDRange(1), NULL, &HistEvent);
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
@@ -254,8 +266,8 @@ int main(int argc, char **argv) {
 
 		// asks user to choose scan type
 		string scanType;
-		cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch(Default) S = Serial: "; // Type a number and press enter
-		cin >> scanType; // Get user input from the keyboard
+		std::cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch(Default) S = Serial: "; // Type a number and press enter
+		std::cin >> scanType; // Get user input from the keyboard
 		if (scanType == "H" || scanType == "h") {
 
 
@@ -343,8 +355,8 @@ int main(int argc, char **argv) {
 
 		// asks user to choose method for finding minum number
 		string minType;
-		cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial (Default) P = Parallel: "; // Type a number and press enter
-		cin >> minType; // Get user input from the keyboard
+		std::cout << "Please select which scan method you would like to find the lowest number in the dataset. S = Serial (Default) P = Parallel: "; // Type a number and press enter
+		std::cin >> minType; // Get user input from the keyboard
 		if (minType == "P" || minType == "p") {
 
 			// runs parallel reduce
@@ -422,8 +434,8 @@ int main(int argc, char **argv) {
 
 		// asks user to choose normalisation method
 		string normType;
-		cout << "Please select which scan method you would like to use to normalise the histogram. S = Serial P = Parallel(Default): "; // Type a number and press enter
-		cin >> normType; // Get user input from the keyboard
+		std::cout << "Please select which scan method you would like to use to normalise the histogram. S = Serial P = Parallel(Default): "; // Type a number and press enter
+		std::cin >> normType; // Get user input from the keyboard
 		if (normType == "S" || normType == "s") {
 
 			// runs serial normalisation
@@ -515,13 +527,15 @@ int main(int argc, char **argv) {
 		
 
 		// creates vector to store equalisation results
-		vector<unsigned char> output_buffer(image_input.size());
+		vector<unsigned int> output_buffer(image_input.size());
 		// creates vector to store equalisation results
-		vector<unsigned char> temp_output_buffer(pixels.size());
+		vector<unsigned int> temp_output_buffer(pixels.size());
 		// asks user to choose normalisation method
+
+		vector<unsigned char> convert;
 		string eqType;
-		cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; // Type a number and press enter
-		cin >> eqType; // Get user input from the keyboard
+		std::cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; // Type a number and press enter
+		std::cin >> eqType; // Get user input from the keyboard
 		if (eqType == "S" || eqType == "s") {
 
 			// Get starting timepoint
@@ -533,7 +547,7 @@ int main(int argc, char **argv) {
 				int new_intensity = 0;
 
 				// gets intensity
-				temp_output_buffer[i] = unsigned char(NormalisedHistogramData[in_intensity]);
+				temp_output_buffer[i] = NormalisedHistogramData[in_intensity];
 			}
 
 			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
@@ -561,7 +575,7 @@ int main(int argc, char **argv) {
 			std::cout << "Parallel selected" << endl;
 			// creates and writes buffer for normalised histogram and output image
 			cl::Buffer BPhistogramBuffer(context, CL_MEM_READ_ONLY, bins * sizeof(unsigned int));
-			cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size()); //should be the same as input image
+			cl::Buffer dev_image_output(context, CL_MEM_READ_WRITE, pixels.size() * sizeof(unsigned int)); //should be the same as input image
 			queue.enqueueWriteBuffer(BPhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), &NormalisedHistogramData[0], NULL, &EqInEvent);
 
 
@@ -574,14 +588,14 @@ int main(int argc, char **argv) {
 			kernel.setArg(3, binDiv);
 
 			// runs kernel
-			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NullRange, NULL, &EqEvent);
+			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &EqEvent);
 
 
 
 			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 
 				// reads results from buffer
-				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, temp_output_buffer.size(), &temp_output_buffer.data()[0], NULL, &EqOutEvent);
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, temp_output_buffer.size() * sizeof(unsigned int), &temp_output_buffer.data()[0], NULL, &EqOutEvent);
 				temp_output_buffer.insert(end(temp_output_buffer), begin(intenEnd), end(intenEnd));
 				output_buffer.assign(temp_output_buffer.begin(), temp_output_buffer.end());
 
@@ -591,7 +605,7 @@ int main(int argc, char **argv) {
 			else {
 
 				// reads results from buffer
-				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size(), &output_buffer.data()[0], NULL, &EqOutEvent);
+				queue.enqueueReadBuffer(dev_image_output, CL_TRUE, 0, output_buffer.size() * sizeof(unsigned int), &output_buffer.data()[0], NULL, &EqOutEvent);
 
 			}
 
@@ -604,9 +618,10 @@ int main(int argc, char **argv) {
 
 		}
 
+		convert.assign(output_buffer.begin(), output_buffer.begin() + output_buffer.size());
 
 		// displays input and output images to users
-		CImg<unsigned char> output_image(output_buffer.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+		CImg<unsigned char> output_image(convert.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
 
 		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 			output_image = output_image.YCbCrtoRGB();
