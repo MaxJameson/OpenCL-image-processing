@@ -20,33 +20,6 @@ kernel void histogram(global const uint* A, global uint* H, global uint* binsDiv
 
 }
 
-kernel void histogram_Local(global const uint* A, global uint* H, global uint* binsDivider,local uint* LocalMem) {
-	// gets the current index for global and local memeory
-	int id = get_global_id(0);
-
-	// Uses a barrier to sync local memeory loading
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	if(id == 0){
-		printf("local size %d\n", get_local_size(0));
-	}
-
-	// gets the intensity value from the image
-	uint pixel = A[id];
-	float bin = (uint)pixel / (*binsDivider);
-	uint location = round(bin);
-
-	// stores in local memeory
-	atomic_inc(&LocalMem[location]);
-
-	// syncs memeory
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// stores in global memeory
-	atomic_add(&H[location], LocalMem[location]);
-
-
-}
 
 //a simple OpenCL kernel which copies all pixels from A to B
 kernel void C_histogram(global  uint* A) {
@@ -110,7 +83,7 @@ kernel void C_histogramhs(global uint* A, global uint* B) {
 
 
 //a simple OpenCL kernel which copies all pixels from A to B
-kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
+kernel void N_histogram( global uint* A, global uint* min, global uint* max, global uint* bits) {
 	int id = get_global_id(0);
 
 	// reduce size of value to prevent overflow
@@ -127,7 +100,7 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max) {
 		// normlises entry between 0 - 1
 		normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
 		// scales normalistion to 0 - 255
-		A[id] = normalised * 255;
+		A[id] = normalised * (*bits - 1);
 	}
 
 
@@ -156,9 +129,10 @@ kernel void reduce(global uint* A){
 
 	// loops through vector
 	for(int stride=1; stride<N; stride*=2){
-		// stores minimum value
 		if((id % (stride*2)) == 0){
-			if(A[id] > A[id+stride] || A[id] == 0){
+			
+			// checks if stride number is lower than new number
+			if(A[id] > A[id+stride] && A[id+stride] != 0){
 				A[id] = A[id+stride];
 			}
 		}

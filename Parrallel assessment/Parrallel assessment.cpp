@@ -41,47 +41,6 @@ int main(int argc, char **argv) {
 	//detect any potential exceptions
 	try {
 
-		bool depthSelect = false;
-		int depth;
-		// stores number of bits per pixel
-		unsigned int bits;
-
-		CImg<unsigned char> image_input(image_filename.c_str());
-		CImg<unsigned short> image_input16(image_filename.c_str());
-		std::vector<unsigned int> intImage;
-
-		// loops until a valid bin is input
-		while(!depthSelect) {
-
-			// takes input for bin
-			std::cout << "Please enter the bit depth of the image: 8 or 16: "; // Type a number and press enter
-			std::cin >> depth; // Get user input from the keyboard
-
-			// checsk if input is valid
-			if (depth == 8) {
-				depthSelect = true;
-				std::cout << "8 bit selected" << endl;
-				bits = 256;
-			}
-			else if (depth == 16) {
-				depthSelect = true;
-				std::cout << "16 bit selected" << endl;
-				bits = 65536;
-			}
-			else {
-				std::cout << "Please select a valid bit depth" << endl;
-				std::cin.clear();
-				std::cin.ignore(1, '\n');
-			}
-
-		}
-
-
-
-		//CImg<unsigned short> input(image_filename.c_str());
-
-		//CImgDisplay tester(input, "output");
-
 		cl::Context context = GetContext(platform_id, device_id);
 
 		//display the selected device
@@ -113,6 +72,11 @@ int main(int argc, char **argv) {
 		/////////////// Image and bin formatting
 		////////////////////////////////////////////////////////
 
+
+
+		CImg<unsigned char> image_input(image_filename.c_str());
+
+
 		// create a vector to store pixels
 		std::vector<unsigned int> pixels;
 		// stores end of intensity values for colour images
@@ -121,25 +85,26 @@ int main(int argc, char **argv) {
 		// checks if the image is colour of greysacel
 		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 
-			// converts colour space
-			image_input = image_input.RGBtoYCbCr();
 
-
-			// creates vector of intensity values and vector of chroma red + blue
-			pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
-			intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
+		// converts colour space
+		image_input = image_input.RGBtoYCbCr();
+		// creates vector of intensity values and vector of chroma red + blue
+		pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
+		intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
 
 		}
 		else {
 
-			// creates vector of greyscale intensities
-			pixels.assign(image_input.begin() + 0, image_input.begin() + image_input.size());
+			// creates vector of intensity values and vector of chroma red + blue
+			pixels.assign(image_input.begin(), image_input.begin() + image_input.size());
+
 		}
 			 
 		// stores bool to check if the value of bins is valid
 		bool binCheck = false;
 		// stores number of bins
 		unsigned int bins;
+		unsigned int bits = 256;
 
 		// stores valid to calculate which bin a pixel belongs too
 		unsigned int binsDivider;
@@ -148,11 +113,11 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 
 			// takes input for bin
-			std::cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
+			std::cout << "Please enter the number of bins you would like between the range of 32 - " << bits << ": "; // Type a number and press enter
 			std::cin >> bins; // Get user input from the keyboard
 
 			// checsk if input is valid
-			if (bins < 32 || bins > 256) {
+			if (bins < 32 || bins > bits) {
 				std::cout << "Invalid input " << endl;
 				std::cin.clear();
 				std::cin.ignore(1, '\n');
@@ -161,7 +126,7 @@ int main(int argc, char **argv) {
 				binCheck = true;
 
 				// calculates the number used to define which bin and intensity belongs too
-				if (bins = bits) {
+				if (bins == bits) {
 					binsDivider = 1;
 				}
 				else {
@@ -171,7 +136,6 @@ int main(int argc, char **argv) {
 
 		}
 
-		std::cout << "" << endl;
 
 
 		////////////////////////////////////////////////////////
@@ -233,8 +197,7 @@ int main(int argc, char **argv) {
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
-			// local memory argument
-			//histogramKernel.setArg(3, bins * sizeof(unsigned int), NULL);
+
 			// runs kernel
 			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &HistEvent);
 			// reads output histogram from the buffer
@@ -386,7 +349,7 @@ int main(int argc, char **argv) {
 			cl::Kernel reduce(program, "reduce");
 			reduce.setArg(0, NhistogramBuffer);
 			// creates vector to store results
-			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &MinEvent);
+			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &MinEvent);
 			std::vector<unsigned int> minStorage(bins);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
@@ -473,7 +436,7 @@ int main(int argc, char **argv) {
 					// normlises entry between 0 - 1
 					normalised = minScale + (currentValue - minNum) * (maxScale - minScale) / (maxNum - minNum);
 					// scales normalistion to 0 - 256
-					NormalisedHistogramData[i] = normalised * 255;
+					NormalisedHistogramData[i] = normalised * bits;
 				}
 			}
 
@@ -497,14 +460,17 @@ int main(int argc, char **argv) {
 			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			cl::Buffer minNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 			cl::Buffer maxNumBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
+			cl::Buffer bitsBuffer(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL, &NormInEvent);
 			queue.enqueueWriteBuffer(minNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &minNum, NULL, &NormMinEvent);
 			queue.enqueueWriteBuffer(maxNumBuffer, CL_TRUE, 0, sizeof(unsigned int), &maxNum, NULL, &NormMaxEvent);
+			queue.enqueueWriteBuffer(bitsBuffer, CL_TRUE, 0, sizeof(unsigned int), &bits);
 			// sets up kernel for normalisation and passes arguments
 			cl::Kernel N_histogramKernel(program, "N_histogram");
 			N_histogramKernel.setArg(0, NhistogramBuffer);
 			N_histogramKernel.setArg(1, minNumBuffer);
 			N_histogramKernel.setArg(2, maxNumBuffer);
+			N_histogramKernel.setArg(3, bitsBuffer);
 			// runs histogram kernel
 			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &NormEvent);
 			// reads results from buffer
@@ -542,8 +508,9 @@ int main(int argc, char **argv) {
 		// creates vector to store equalisation results
 		vector<unsigned int> temp_output_buffer(pixels.size());
 		// asks user to choose normalisation method
+		vector<unsigned char> convert(image_input.size());
 
-		vector<unsigned char> convert;
+
 		string eqType;
 		std::cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; // Type a number and press enter
 		std::cin >> eqType; // Get user input from the keyboard
@@ -629,6 +596,8 @@ int main(int argc, char **argv) {
 
 		}
 
+
+
 		convert.assign(output_buffer.begin(), output_buffer.begin() + output_buffer.size());
 
 		// displays input and output images to users
@@ -651,6 +620,8 @@ int main(int argc, char **argv) {
 		}
 
 
+
+
 	}
 	catch (const cl::Error& err) {
 		std::cerr << "ERROR: " << err.what() << ", " << getErrorString(err.err()) << std::endl;
@@ -661,3 +632,4 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+
