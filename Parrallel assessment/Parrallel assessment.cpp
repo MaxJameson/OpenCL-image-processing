@@ -9,6 +9,19 @@
 
 using namespace cimg_library;
 
+int gcd(int a, int b)
+{
+	int result = min(a, b); // Find Minimum of a and b
+	while (result > 0) {
+		if (a % result == 0 && b % result == 0) {
+			break;
+		}
+		result--;
+	}
+	return result; // return gcd of a and b
+}
+
+
 
 void print_help() {
 	std::cerr << "Application usage:" << std::endl;
@@ -148,14 +161,14 @@ int main(int argc, char **argv) {
 		// creates vector to store output
 		std::vector<unsigned int> histogramData(bins);
 
-		// creates buffer for bin calculator and the input image - buffers used in more than one Kernel
-		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
-		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, pixels.size() * sizeof(unsigned int));
-
 		// creates events to track runtime
 		cl::Event inIamgeTransfer;
 		cl::Event dividerTransfer;
 		cl::Event histOut;
+
+		// creates buffer for bin calculator and the input image - buffers used in more than one Kernel
+		cl::Buffer dev_image_input(context, CL_MEM_READ_ONLY, pixels.size() * sizeof(unsigned int));
+		cl::Buffer binDiv(context, CL_MEM_READ_ONLY, sizeof(unsigned int));
 
 		// write previous two buffers to the memory buffer - buffers used in more than one Kernel
 		queue.enqueueWriteBuffer(dev_image_input, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), &pixels[0], NULL, &inIamgeTransfer);
@@ -208,13 +221,19 @@ int main(int argc, char **argv) {
 
 			// creates kernel and sets argumements
 			cl::Kernel histogramKernel(program, "histogram");
+			cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+			int hcf = gcd(pixels.size(), histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
 			//histogramKernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
 
+
+
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &HistEvent);
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(hcf), NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
