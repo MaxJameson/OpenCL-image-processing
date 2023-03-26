@@ -20,6 +20,27 @@ kernel void histogram(global const uint* A, global uint* H, global uint* binsDiv
 
 }
 
+kernel void histogram_Local( global const int * A, global int * H,global uint* binsDivider,local int * LH) {
+	int id = get_global_id(0); int lid = get_local_id(0);
+	int bin_index = A[id];
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+		// gets the intensity value from the image and calculates it's bin
+	uint pixel = A[id];
+	float bin = (uint)pixel / (*binsDivider);
+	uint location = round(bin);
+
+	atomic_inc(&LH[location]);
+	
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if (id < 256){
+		atomic_add(&H[id], LH[id]);
+	}
+
+}
+
 
 //a simple OpenCL kernel which copies all pixels from A to B
 kernel void C_histogram(global  uint* A) {

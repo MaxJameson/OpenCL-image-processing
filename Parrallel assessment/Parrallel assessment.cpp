@@ -194,9 +194,12 @@ int main(int argc, char **argv) {
 			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			// creates kernel and sets argumements
 			cl::Kernel histogramKernel(program, "histogram");
+
+			cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0]; // get device 
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
+			//histogramKernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
 
 			// runs kernel
 			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &HistEvent);
@@ -559,14 +562,14 @@ int main(int argc, char **argv) {
 
 
 			// sets up kernel for back propogation and passes arguments
-			cl::Kernel kernel = cl::Kernel(program, "equalise");
-			kernel.setArg(0, dev_image_input);
-			kernel.setArg(1, dev_image_output);
-			kernel.setArg(2, BPhistogramBuffer);
-			kernel.setArg(3, binDiv);
+			cl::Kernel equal(program, "equalise");
+			equal.setArg(0, dev_image_input);
+			equal.setArg(1, dev_image_output);
+			equal.setArg(2, BPhistogramBuffer);
+			equal.setArg(3, binDiv);
 
 			// runs kernel
-			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &EqEvent);
+			queue.enqueueNDRangeKernel(equal, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &EqEvent);
 
 
 
