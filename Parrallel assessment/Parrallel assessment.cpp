@@ -112,14 +112,15 @@ int main(int argc, char **argv) {
 
 
 
-		// stores each pixel in an image
+		// stores the values of each pixel from the image
 		std::vector<unsigned int> pixels;
-		// stores end of intensity values for colour images
 		std::vector<unsigned int> intenEnd;
 
-		unsigned int bits = 0;
+		// stores the bitdepth of the image
+		unsigned int bits;
+
+		// loops until a valid bit depth has been input
 		bool bitCheck = false;
-		// loops until a valid bin is input
 		while (!bitCheck) {
 
 			// takes input for bin
@@ -248,8 +249,7 @@ int main(int argc, char **argv) {
 		// Asked user to choose histogram type
 		string histType;
 		std::cout << "Invalid options will run default option" << endl;
-		std::cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: "; // Type a number and press enter
-		// Get user input from the keyboard
+		std::cout << "Please select which Histogram method you would like to run. P = Parallel(Default) S = Serial: ";
 		std::cin >> histType; 
 
 		if (histType == "S" || histType == "s") {
@@ -288,16 +288,16 @@ int main(int argc, char **argv) {
 			cl::Buffer histogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 
 			// creates kernel and sets argumements
-			cl::Kernel histogramKernel(program, "histogram");
-			histogramKernel.setArg(0, dev_image_input);
-			histogramKernel.setArg(1, histogramBuffer);
-			histogramKernel.setArg(2, binDiv);
+			cl::Kernel histogram_Kernel(program, "histogram");
+			histogram_Kernel.setArg(0, dev_image_input);
+			histogram_Kernel.setArg(1, histogramBuffer);
+			histogram_Kernel.setArg(2, binDiv);
 
 			// calculates optimim bin size for kernel
-			int LocalSize = gcd(pixels.size(), histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+			int LocalSize = gcd(pixels.size(), histogram_Kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
 
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &HistEvent);
+			queue.enqueueNDRangeKernel(histogram_Kernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
@@ -361,29 +361,21 @@ int main(int argc, char **argv) {
 				std::cout << "Local selected" << endl;
 
 				// runs kernel for local Hillis-steele scan
-				cl::Kernel C_histogramKernel(program, "C_histogramhs_Local");
-				C_histogramKernel.setArg(0, ChistogramBuffer);
-				C_histogramKernel.setArg(1, OuthistogramBuffer);
-				C_histogramKernel.setArg(2, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				C_histogramKernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
-
-				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
+				cl::Kernel Cumulative_kernel(program, "hs_local");
+				Cumulative_kernel.setArg(0, ChistogramBuffer);
+				Cumulative_kernel.setArg(1, OuthistogramBuffer);
+				Cumulative_kernel.setArg(2, cl::Local(histogramData.size() * sizeof(unsigned int)));
+				Cumulative_kernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
+				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			}
 			else {
 
 				std::cout << "Global selected" << endl;
 				// runs kernel for global Hillis-steele scan
-				cl::Kernel C_histogramKernel(program, "C_histogramhs");
-				C_histogramKernel.setArg(0, ChistogramBuffer);
-				C_histogramKernel.setArg(1, OuthistogramBuffer);
-
-				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
+				cl::Kernel Cumulative_Kernel(program, "hs");
+				Cumulative_Kernel.setArg(0, ChistogramBuffer);
+				Cumulative_Kernel.setArg(1, OuthistogramBuffer);
+				queue.enqueueNDRangeKernel(Cumulative_Kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			}
 
 
@@ -432,25 +424,17 @@ int main(int argc, char **argv) {
 			if (LorG == "L" || LorG == "l") {
 
 				// runs kernel for local Blelloch scan
-				cl::Kernel C_histogramKernel(program, "C_histogram_Local");
-				C_histogramKernel.setArg(0, ChistogramBuffer);
-				C_histogramKernel.setArg(1, cl::Local(histogramData.size() * sizeof(unsigned int)));
-
-				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
+				cl::Kernel Cumulative_kernel(program, "blelloch_local");
+				Cumulative_kernel.setArg(0, ChistogramBuffer);
+				Cumulative_kernel.setArg(1, cl::Local(histogramData.size() * sizeof(unsigned int)));
+				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			}
 			else {
 
 				// runs kernel for global Blelloch scan
-				cl::Kernel C_histogramKernel(program, "C_histogram");
-				C_histogramKernel.setArg(0, ChistogramBuffer);
-
-				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+				cl::Kernel Cumulative_kernel(program, "blelloch");
+				Cumulative_kernel.setArg(0, ChistogramBuffer);
+				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			}
 
 			// reads output histogram from the buffer
@@ -498,21 +482,21 @@ int main(int argc, char **argv) {
 			cl::Event MinOutEvent;
 
 			// creates and writes buffer to store output data
-			cl::Buffer NhistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
-			queue.enqueueWriteBuffer(NhistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL, &MinInEvent);
+			cl::Buffer numberBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
+			queue.enqueueWriteBuffer(numberBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), &CumulativeHistogramData[0], NULL, &MinInEvent);
 
 			// runs kernal to find the minimun non zero number in a dataset
-			cl::Kernel reduce(program, "reduce");
-			reduce.setArg(0, NhistogramBuffer);
+			cl::Kernel Reduce(program, "reduce");
+			Reduce.setArg(0, numberBuffer);
 
 			cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-			int hcf = gcd(bins, reduce.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+			int hcf = gcd(bins, Reduce.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
 
-			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(hcf), NULL, &MinEvent);
+			queue.enqueueNDRangeKernel(Reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(hcf), NULL, &MinEvent);
 
 			// reads results from buffer
 			std::vector<unsigned int> minStorage(bins);
-			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
+			queue.enqueueReadBuffer(numberBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
 
 			// outputs histogram runtime along with memeory transfer time
 			std::cout << "Kernel execution time [ns]:" << MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -626,12 +610,12 @@ int main(int argc, char **argv) {
 			queue.enqueueWriteBuffer(bitsBuffer, CL_TRUE, 0, sizeof(unsigned int), &bits);
 
 			// runs normalistaion kernel
-			cl::Kernel N_histogramKernel(program, "N_histogram");
-			N_histogramKernel.setArg(0, NhistogramBuffer);
-			N_histogramKernel.setArg(1, minNumBuffer);
-			N_histogramKernel.setArg(2, maxNumBuffer);
-			N_histogramKernel.setArg(3, bitsBuffer);
-			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &NormEvent);
+			cl::Kernel Normalise_kernel(program, "normalise");
+			Normalise_kernel.setArg(0, NhistogramBuffer);
+			Normalise_kernel.setArg(1, minNumBuffer);
+			Normalise_kernel.setArg(2, maxNumBuffer);
+			Normalise_kernel.setArg(3, bitsBuffer);
+			queue.enqueueNDRangeKernel(Normalise_kernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &NormEvent);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
@@ -725,16 +709,16 @@ int main(int argc, char **argv) {
 
 
 			// runs kernel for requalisation
-			cl::Kernel equal(program, "equalise");
-			equal.setArg(0, dev_image_input);
-			equal.setArg(1, dev_image_output);
-			equal.setArg(2, BPhistogramBuffer);
-			equal.setArg(3, binDiv);
+			cl::Kernel Equalise(program, "equalise");
+			Equalise.setArg(0, dev_image_input);
+			Equalise.setArg(1, dev_image_output);
+			Equalise.setArg(2, BPhistogramBuffer);
+			Equalise.setArg(3, binDiv);
 
 			// calculates optimim bin size for kernel
-			int LocalSize = gcd(pixels.size(), equal.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+			int LocalSize = gcd(pixels.size(), Equalise.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
 
-			queue.enqueueNDRangeKernel(equal, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &EqEvent);
+			queue.enqueueNDRangeKernel(Equalise, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &EqEvent);
 
 
 			// checks if the image is colour or greyscale

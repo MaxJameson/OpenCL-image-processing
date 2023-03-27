@@ -21,7 +21,7 @@ kernel void histogram(global const uint* A, global uint* H, global uint* binsDiv
 }
 
 // locally counts the occurence of each intensity
-kernel void histogram_Local( global const int * A, global int * H,global uint* binsDivider,local int * LH) {
+kernel void histogram_local( global const int * A, global int * H,global uint* binsDivider,local int * LH) {
 	// gets index values
 	int id = get_global_id(0); int lid = get_local_id(0);
 
@@ -47,7 +47,7 @@ kernel void histogram_Local( global const int * A, global int * H,global uint* b
 
 
 // cumulative histogram using Blelloch scan in global memory
-kernel void C_histogram(global  uint* A) {
+kernel void blelloch(global  uint* A) {
 	
 	// gets index values
 	int id = get_global_id(0);
@@ -90,7 +90,7 @@ kernel void C_histogram(global  uint* A) {
 }
 
 // cumulative histogram using Blelloch scan on local memory
-kernel void C_histogram_Local(global  uint* A, local uint* l) {
+kernel void blelloch_local(global  uint* A, local uint* l) {
 	
 	// get index values
 	int id = get_global_id(0);
@@ -143,7 +143,7 @@ kernel void C_histogram_Local(global  uint* A, local uint* l) {
 }
 
 // Hillis-Steele basic inclusive scan
-kernel void C_histogramhs(global uint* A, global uint* B) {
+kernel void hs(global uint* A, global uint* B) {
 	int id = get_global_id(0);
 	int N = get_global_size(0);
 
@@ -167,7 +167,7 @@ kernel void C_histogramhs(global uint* A, global uint* B) {
 }
 
 // Hillis-Steele basic inclusive scan on local memory
-kernel void C_histogramhs_Local(global uint* A, global uint* B, local uint* lA, local uint* lB) {
+kernel void hs_local(global uint* A, global uint* B, local uint* lA, local uint* lB) {
 	int id = get_global_id(0);
 	int N = get_global_size(0);
 	int lid = get_local_id(0);
@@ -198,9 +198,30 @@ kernel void C_histogramhs_Local(global uint* A, global uint* B, local uint* lA, 
 	atomic_xchg(&B[id], lB[lid]);
 }
 
+// a kernel to find the smallest non 0 number in the dataset
+kernel void reduce(global uint* A){
+	int id = get_local_id(0);
+	int N = get_local_size(0);
+
+	// loops through vector
+	for(int stride=1; stride<N; stride*=2){
+		if((id % (stride*2)) == 0){
+			
+			// checks if stride number is lower than new number
+			if(A[id] > A[id+stride] && A[id+stride] != 0){
+
+				// updates new value with new minimum
+				A[id] = A[id+stride];
+			}
+		}
+		// syncs memeory
+		barrier(CLK_GLOBAL_MEM_FENCE);
+	}
+}
+
 
 // A kenrel to normalise a histogram
-kernel void N_histogram( global uint* A, global uint* min, global uint* max, global uint* bits) {
+kernel void normalise( global uint* A, global uint* min, global uint* max, global uint* bits) {
 	int id = get_global_id(0);
 
 	// reduce size of value to prevent overflow
@@ -234,23 +255,4 @@ kernel void equalise( global uint* in, global uint* out,global uint* hist, globa
 
 }
 
-// a kernel to find the smallest non 0 number in the dataset
-kernel void reduce(global uint* A){
-	int id = get_local_id(0);
-	int N = get_local_size(0);
 
-	// loops through vector
-	for(int stride=1; stride<N; stride*=2){
-		if((id % (stride*2)) == 0){
-			
-			// checks if stride number is lower than new number
-			if(A[id] > A[id+stride] && A[id+stride] != 0){
-
-				// updates new value with new minimum
-				A[id] = A[id+stride];
-			}
-		}
-		// syncs memeory
-		barrier(CLK_GLOBAL_MEM_FENCE);
-	}
-}
