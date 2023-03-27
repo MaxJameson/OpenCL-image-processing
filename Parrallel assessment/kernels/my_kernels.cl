@@ -1,5 +1,5 @@
 
-// Counts occurence of each intensity
+// counts occurence of each intensity
 kernel void histogram(global const uint* A, global uint* H, global uint* binsDivider) {
 	
 	// gets the current index
@@ -54,6 +54,7 @@ kernel void C_histogram(global  uint* A) {
 	int n = get_global_size(0);
 	int t;
 
+
 	// runs upsweep on vector
 	for (int stride = 1; stride < n; stride *=2){
 		if(((id+1) % (stride*2)) == 0){
@@ -88,13 +89,13 @@ kernel void C_histogram(global  uint* A) {
 	}
 }
 
-// cumulative histogram using Blelloch scan in local memory
+// cumulative histogram using Blelloch scan on local memory
 kernel void C_histogram_Local(global  uint* A, local uint* l) {
 	
 	// get index values
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
-	int n = get_local_size(0);
+	int n = get_global_size(0);
 	int t;
 
 	// passes global memory to local
@@ -141,7 +142,7 @@ kernel void C_histogram_Local(global  uint* A, local uint* l) {
 	atomic_xchg(&A[id], l[lid]);
 }
 
-//Hillis-Steele basic inclusive scan
+// Hillis-Steele basic inclusive scan
 kernel void C_histogramhs(global uint* A, global uint* B) {
 	int id = get_global_id(0);
 	int N = get_global_size(0);
@@ -165,10 +166,10 @@ kernel void C_histogramhs(global uint* A, global uint* B) {
 	}
 }
 
-//Hillis-Steele basic inclusive scan
+// Hillis-Steele basic inclusive scan on local memory
 kernel void C_histogramhs_Local(global uint* A, global uint* B, local uint* lA, local uint* lB) {
 	int id = get_global_id(0);
-	int N = get_local_size(0);
+	int N = get_global_size(0);
 	int lid = get_local_id(0);
 
 	lA[lid] = A[id];
@@ -198,7 +199,7 @@ kernel void C_histogramhs_Local(global uint* A, global uint* B, local uint* lA, 
 }
 
 
-//a simple OpenCL kernel which copies all pixels from A to B
+// A kenrel to normalise a histogram
 kernel void N_histogram( global uint* A, global uint* min, global uint* max, global uint* bits) {
 	int id = get_global_id(0);
 
@@ -215,32 +216,25 @@ kernel void N_histogram( global uint* A, global uint* min, global uint* max, glo
 	else{
 		// normlises entry between 0 - 1
 		normalised = minScale + (currentValue - *min) * (maxScale - minScale) / (*max - *min);
-		// scales normalistion to 0 - 255
+		// scales normalistion to 0 - max size of bit depth
 		A[id] = normalised * (*bits - 1);
 	}
 
 
 }
 
-//a simple OpenCL kernel which copies all pixels from A to B
+// a kernel to equalise the output image
 kernel void equalise( global uint* in, global uint* out,global uint* hist, global uint* binsDivider) {
 	int id = get_global_id(0);
 	// calculates bin location
 	int in_intensity = in[id] / *binsDivider;
 
-	// prevents final value from reaching outide scope
-	if(id == get_global_size(0)){
-		// gets intensity
-		out[id] = hist[in_intensity];
-	}
-	else{
-		// accounts for Blelloch scan being inclusive
-		out[id] = hist[in_intensity + 1];
-	}
+	// passes intnsity to the image
+	out[id] = hist[in_intensity];
 
 }
 
-
+// a kernel to find the smallest non 0 number in the dataset
 kernel void reduce(global uint* A){
 	int id = get_local_id(0);
 	int N = get_local_size(0);

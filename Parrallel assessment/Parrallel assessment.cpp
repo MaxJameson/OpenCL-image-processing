@@ -9,8 +9,21 @@
 
 using namespace cimg_library;
 
+
+
+
 int gcd(int a, int b)
 {
+
+/***************************************************************************************
+*    Title: Program to Find GCD or HCF of Two Numbers
+*    Author: GeeksforGeeks
+*    Date: 14 Mar, 2023
+*    Code version: N/A
+*    Availability: https://www.geeksforgeeks.org/program-to-find-gcd-or-hcf-of-two-numbers/
+*
+***************************************************************************************/
+
 	int result = min(a, b); // Find Minimum of a and b
 	while (result > 0) {
 		if (a % result == 0 && b % result == 0) {
@@ -20,6 +33,7 @@ int gcd(int a, int b)
 	}
 	return result; // return gcd of a and b
 }
+
 
 
 
@@ -81,6 +95,8 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 
+		cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+
 		std::cout << "" << endl;
 
 		////////////////////////////////////////////////////////
@@ -88,8 +104,12 @@ int main(int argc, char **argv) {
 		////////////////////////////////////////////////////////
 
 
-		// converts input file to a Cimg
+		// converts input file to a Cimg - 8bit
 		CImg<unsigned char> image_input(image_filename.c_str());
+
+		// converts input file to a Cimg - 16bit
+		CImg<unsigned short> image_input16(image_filename.c_str());
+
 
 
 		// stores each pixel in an image
@@ -97,30 +117,78 @@ int main(int argc, char **argv) {
 		// stores end of intensity values for colour images
 		std::vector<unsigned int> intenEnd;
 
-		// checks if the image is colour of greysacel
-		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+		unsigned int bits = 0;
+		bool bitCheck = false;
+		// loops until a valid bin is input
+		while (!bitCheck) {
+
+			// takes input for bin
+			std::cout << "Is this a 8 or 16 bit image? : "; // Type a number and press enter
+			std::cin >> bits; // Get user input from the keyboard
+
+			// checsk if input is valid
+			if (bits == 8) {
+				bits = 256;
+				std::cout << "8 bit selected" << endl;
+				bitCheck = true;
+
+				// sets up 8 bit image
+				// checks if the image is colour of greysacel
+				if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
 
 
-		// converts colour space
-		image_input = image_input.RGBtoYCbCr();
-		// creates vector of intensity values and vector of chroma red + blue
-		pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
-		intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
+					// converts colour space
+					image_input = image_input.RGBtoYCbCr();
+					// creates vector of intensity values and vector of chroma red + blue
+					pixels.assign(image_input.begin(), image_input.begin() + (image_input.size() / 3));
+					intenEnd.assign(image_input.begin() + (image_input.size() / 3) + 1, image_input.end());
+
+				}
+				else {
+
+					// creates vector of intensity values and vector of chroma red + blue
+					pixels.assign(image_input.begin(), image_input.begin() + image_input.size());
+
+				}
+			}
+			else if (bits == 16) {
+				bits = 65536;
+				std::cout << "16 bit selected" << endl;
+				bitCheck = true;
+
+				// sets up 16 bit image
+				// checks if the image is colour of greysacel
+				if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+
+
+					// converts colour space
+					image_input16 = image_input16.RGBtoYCbCr();
+					// creates vector of intensity values and vector of chroma red + blue
+					pixels.assign(image_input16.begin(), image_input16.begin() + (image_input16.size() / 3));
+					intenEnd.assign(image_input16.begin() + (image_input16.size() / 3) + 1, image_input16.end());
+
+				}
+				else {
+
+					// creates vector of intensity values and vector of chroma red + blue
+					pixels.assign(image_input16.begin(), image_input16.begin() + image_input16.size());
+
+				}
+			}
+			else {
+				std::cout << "Invalid input " << endl;
+				std::cin.clear();
+				std::cin.ignore(1, '\n');
+			}
 
 		}
-		else {
 
-			// creates vector of intensity values and vector of chroma red + blue
-			pixels.assign(image_input.begin(), image_input.begin() + image_input.size());
-
-		}
 			 
 		// stores bool to check if the value of bins is valid
 		bool binCheck = false;
 
 		// stores number of bins and max intesity value per pixel
 		unsigned int bins;
-		unsigned int bits = 256;
 
 		// stores valid to calculate which bin a pixel belongs too
 		unsigned int binsDivider;
@@ -129,11 +197,11 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 
 			// takes input for bin
-			std::cout << "Please enter the number of bins you would like between the range of 32 - " << bits << ": "; // Type a number and press enter
+			std::cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
 			std::cin >> bins; // Get user input from the keyboard
 
 			// checsk if input is valid
-			if (bins < 32 || bins > bits) {
+			if (bins < 32 || bins > 256) {
 				std::cout << "Invalid input " << endl;
 				std::cin.clear();
 				std::cin.ignore(1, '\n');
@@ -221,19 +289,15 @@ int main(int argc, char **argv) {
 
 			// creates kernel and sets argumements
 			cl::Kernel histogramKernel(program, "histogram");
-			cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-			int hcf = gcd(pixels.size(), histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
-
 			histogramKernel.setArg(0, dev_image_input);
 			histogramKernel.setArg(1, histogramBuffer);
 			histogramKernel.setArg(2, binDiv);
-			//histogramKernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
 
-
+			// calculates optimim bin size for kernel
+			int LocalSize = gcd(pixels.size(), histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
 
 			// runs kernel
-			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(hcf), NULL, &HistEvent);
+			queue.enqueueNDRangeKernel(histogramKernel, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &HistEvent);
 			// reads output histogram from the buffer
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
@@ -302,7 +366,11 @@ int main(int argc, char **argv) {
 				C_histogramKernel.setArg(1, OuthistogramBuffer);
 				C_histogramKernel.setArg(2, cl::Local(histogramData.size() * sizeof(unsigned int)));
 				C_histogramKernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+
+				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
 			}
 			else {
 
@@ -311,7 +379,11 @@ int main(int argc, char **argv) {
 				cl::Kernel C_histogramKernel(program, "C_histogramhs");
 				C_histogramKernel.setArg(0, ChistogramBuffer);
 				C_histogramKernel.setArg(1, OuthistogramBuffer);
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+
+				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
 			}
 
 
@@ -363,13 +435,21 @@ int main(int argc, char **argv) {
 				cl::Kernel C_histogramKernel(program, "C_histogram_Local");
 				C_histogramKernel.setArg(0, ChistogramBuffer);
 				C_histogramKernel.setArg(1, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+
+				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(hcf), NULL, &ScanEvent);
 			}
 			else {
 
 				// runs kernel for global Blelloch scan
 				cl::Kernel C_histogramKernel(program, "C_histogram");
 				C_histogramKernel.setArg(0, ChistogramBuffer);
+
+				cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+				int hcf = gcd(bins, C_histogramKernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
 				queue.enqueueNDRangeKernel(C_histogramKernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
 			}
 
@@ -424,7 +504,11 @@ int main(int argc, char **argv) {
 			// runs kernal to find the minimun non zero number in a dataset
 			cl::Kernel reduce(program, "reduce");
 			reduce.setArg(0, NhistogramBuffer);
-			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &MinEvent);
+
+			cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
+			int hcf = gcd(bins, reduce.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+			queue.enqueueNDRangeKernel(reduce, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(hcf), NULL, &MinEvent);
 
 			// reads results from buffer
 			std::vector<unsigned int> minStorage(bins);
@@ -471,7 +555,7 @@ int main(int argc, char **argv) {
 		minNum = minNum / 10;
 		maxNum = maxNum / 10;
 
-
+		std::cout << "" << endl;
 
 		////////////////////////////////////////////////////////
 		/////////////// Histogram normalisaiton
@@ -510,7 +594,7 @@ int main(int argc, char **argv) {
 					// normlises entry between 0 - 1
 					normalised = minScale + (currentValue - minNum) * (maxScale - minScale) / (maxNum - minNum);
 					// scales normalistion to 0 - 256
-					NormalisedHistogramData[i] = normalised * bits;
+					NormalisedHistogramData[i] = normalised * (bits - 1);
 				}
 			}
 
@@ -547,7 +631,7 @@ int main(int argc, char **argv) {
 			N_histogramKernel.setArg(1, minNumBuffer);
 			N_histogramKernel.setArg(2, maxNumBuffer);
 			N_histogramKernel.setArg(3, bitsBuffer);
-			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, &NormEvent);
+			queue.enqueueNDRangeKernel(N_histogramKernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &NormEvent);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
@@ -582,6 +666,8 @@ int main(int argc, char **argv) {
 		vector<unsigned int> temp_output_buffer(pixels.size());
 		// stores converted image
 		vector<unsigned char> convert(image_input.size());
+		// stores converted image
+		vector<unsigned short> convert16(image_input.size());
 
 		// asks user to select which equlisation they want to use
 		string eqType;
@@ -644,7 +730,11 @@ int main(int argc, char **argv) {
 			equal.setArg(1, dev_image_output);
 			equal.setArg(2, BPhistogramBuffer);
 			equal.setArg(3, binDiv);
-			queue.enqueueNDRangeKernel(equal, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(1), NULL, &EqEvent);
+
+			// calculates optimim bin size for kernel
+			int LocalSize = gcd(pixels.size(), equal.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+			queue.enqueueNDRangeKernel(equal, cl::NullRange, cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &EqEvent);
 
 
 			// checks if the image is colour or greyscale
@@ -675,32 +765,64 @@ int main(int argc, char **argv) {
 
 		}
 
+		// checks if the image is 8 or 16 bit
+		if (bits == 65536) {
+			// converts vector of ints to vector of char
+			convert16.assign(output_buffer.begin(), output_buffer.begin() + output_buffer.size());
 
-		// converts vector of ints to vector of char
-		convert.assign(output_buffer.begin(), output_buffer.begin() + output_buffer.size());
+			// adds equalised pixels to a CImg
+			CImg<unsigned short> output_image(convert16.data(), image_input16.width(), image_input16.height(), image_input16.depth(), image_input16.spectrum());
 
-		// adds equalised pixels to a CImg
-		CImg<unsigned char> output_image(convert.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+			// reconverts colour space of colour image
+			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+				output_image = output_image.YCbCrtoRGB();
+				image_input16 = image_input16.YCbCrtoRGB();
+			}
 
-		// reconverts colour space of colour image
-		if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
-			output_image = output_image.YCbCrtoRGB();
-			image_input = image_input.YCbCrtoRGB();
+			// displays original and equalised images
+			CImgDisplay disp_input(image_input16, "input");
+			CImgDisplay disp_output(output_image, "output");
+
+			// stops and displays overall program timer
+			auto Mainstop = std::chrono::high_resolution_clock::now();
+			auto Mainduration = std::chrono::duration_cast<std::chrono::nanoseconds>(Mainstop - Mainstart);
+			std::cout << "Overall execution time: " << Mainduration.count() << " NS" << endl;
+
+			while (!disp_input.is_closed() && !disp_output.is_closed() && !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				disp_input.wait(1);
+				disp_output.wait(1);
+			}
+		}
+		else {
+			// converts vector of ints to vector of char
+			convert.assign(output_buffer.begin(), output_buffer.begin() + output_buffer.size());
+
+			// adds equalised pixels to a CImg
+			CImg<unsigned char> output_image(convert.data(), image_input.width(), image_input.height(), image_input.depth(), image_input.spectrum());
+
+			// reconverts colour space of colour image
+			if (image_filename.substr(image_filename.find_last_of(".") + 1) == "ppm") {
+				output_image = output_image.YCbCrtoRGB();
+				image_input = image_input.YCbCrtoRGB();
+			}
+
+			// displays original and equalised images
+			CImgDisplay disp_input(image_input, "input");
+			CImgDisplay disp_output(output_image, "output");
+
+			// stops and displays overall program timer
+			auto Mainstop = std::chrono::high_resolution_clock::now();
+			auto Mainduration = std::chrono::duration_cast<std::chrono::nanoseconds>(Mainstop - Mainstart);
+			std::cout << "Overall execution time: " << Mainduration.count() << " NS" << endl;
+
+			while (!disp_input.is_closed() && !disp_output.is_closed() && !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
+				disp_input.wait(1);
+				disp_output.wait(1);
+			}
 		}
 
-		// displays original and equalised images
-		CImgDisplay disp_input(image_input, "input");
-		CImgDisplay disp_output(output_image, "output");
 
-		// stops and displays overall program timer
-		auto Mainstop = std::chrono::high_resolution_clock::now();
-		auto Mainduration = std::chrono::duration_cast<std::chrono::nanoseconds>(Mainstop - Mainstart);
-		std::cout << "Overall execution time: " << Mainduration.count() << " NS" << endl;
 
-		while (!disp_input.is_closed() && !disp_output.is_closed() && !disp_input.is_keyESC() && !disp_output.is_keyESC()) {
-			disp_input.wait(1);
-			disp_output.wait(1);
-		}
 
 	}
 	catch (const cl::Error& err) {
