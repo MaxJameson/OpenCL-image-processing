@@ -64,7 +64,7 @@ kernel void blelloch(global  uint* A) {
 }
 
 // cumulative histogram using Blelloch scan on local memory
-kernel void blelloch_local(global  uint* A, global uint* sums,local uint* l, local uint* temp) {
+kernel void blelloch_local(global  uint* A, global uint* sums,local uint* l) {
 	
 	// get index values
 	int id = get_global_id(0);

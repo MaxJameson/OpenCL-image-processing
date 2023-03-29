@@ -240,11 +240,11 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 
 			// takes input for bin
-			std::cout << "Please enter the number of bins you would like between the range of 32 - " << bits << ": "; // Type a number and press enter
-			std::cin >> bins; // Get user input from the keyboard
+			std::cout << "Please enter a number of bins that is greater than 32 and no more than " << bits << ": "; 
+			std::cin >> bins; 
 
 			// checsk if input is valid
-			if (bins < 32 || bins > bits) {
+			if ( bits % bins != 0 && bits > 32) {
 				std::cout << "Invalid input " << endl;
 				std::cin.clear();
 				std::cin.ignore(1, '\n');
@@ -505,7 +505,6 @@ int main(int argc, char **argv) {
 				Cumulative_kernel.setArg(0, ChistogramBuffer);
 				Cumulative_kernel.setArg(1, sumsBuffer);
 				Cumulative_kernel.setArg(2, cl::Local(LocalSize * sizeof(unsigned int)));
-				Cumulative_kernel.setArg(3, cl::Local(LocalSize * sizeof(unsigned int)));
 				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(LocalSize), NULL, &ScanEvent);
 
 				// reads histogram from kernel
@@ -712,11 +711,8 @@ int main(int argc, char **argv) {
 			Normalise_kernel.setArg(2, maxNumBuffer);
 			Normalise_kernel.setArg(3, bitsBuffer);
 
-			// calculates optimim bin size for kernel
-			int LocalSize = gcd(pixels.size(), Normalise_kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
-
 			// runs kernel
-			queue.enqueueNDRangeKernel(Normalise_kernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(LocalSize), NULL, &NormEvent);
+			queue.enqueueNDRangeKernel(Normalise_kernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NullRange, NULL, & NormEvent);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
@@ -756,7 +752,7 @@ int main(int argc, char **argv) {
 
 		// asks user to select which equlisation they want to use
 		string eqType;
-		std::cout << "Please select which scan method you would like to use to equalise the . S = Serial P = Parallel(Default): "; 
+		std::cout << "Please select which scan method you would like to use to equalise the image. S = Serial P = Parallel(Default): "; 
 		std::cin >> eqType;
 		if (eqType == "S" || eqType == "s") {
 
