@@ -137,7 +137,7 @@ kernel void blelloch_local(global  uint* A, global uint* sums,local uint* l, loc
 		barrier(CLK_LOCAL_MEM_FENCE);
 	}
 
-
+	// store cumulative sums for global addition
 	if(lid == n-1){
 		sums[group] = l[lid];
 	}
@@ -177,6 +177,7 @@ kernel void hs_local(global uint* A, global uint* B, global uint* sum,local uint
 	int lid = get_local_id(0);
 	int group = get_group_id(0);
 
+	// passes global memory to local
 	lA[lid] = A[id];
 
 	barrier(CLK_LOCAL_MEM_FENCE);
@@ -199,6 +200,7 @@ kernel void hs_local(global uint* A, global uint* B, global uint* sum,local uint
 		C = lA; lA = lB; lB = C; //swap A & B between steps
 	}
 
+		// store cumulative sums for global addition
 	if(lid == N-1){
 		sum[group] = lB[lid];
 	}
@@ -208,11 +210,12 @@ kernel void hs_local(global uint* A, global uint* B, global uint* sum,local uint
 	atomic_xchg(&B[id], lB[lid]);
 }
 
-
+// adds cumulative sums to local work groups
 kernel void local_Sum(global uint* hist, global uint* sums){
 	int id = get_global_id(0);
 	int group = get_group_id(0);
 
+	// adds the cumulative sum of the previous workgroup to this workgroup
 	hist[id] += sums[group];
 }
 
