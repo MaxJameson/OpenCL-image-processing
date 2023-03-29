@@ -42,8 +42,7 @@ std::vector<unsigned int> localsum(vector<unsigned int> pixels, vector<unsigned 
 	// reads output histogram from the buffer
 	queue.enqueueReadBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), pixels.data(), NULL, &outputTansfer);
 
-	// outputs 
-	std::cout << "Kernel execution time [ns]:" << sumEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - sumEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+	// outputs runtime
 	std::cout << GetFullProfilingInfo(sumEvent, ProfilingResolution::PROF_NS) << std::endl;
 	std::cout << "Image transfer time [ns]:" << pixelTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - pixelTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 	std::cout << "binsize transfer time [ns]:" << sumsTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - sumsTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -344,7 +343,6 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(histogramBuffer, CL_TRUE, 0, histogramData.size() * sizeof(unsigned int), histogramData.data(), NULL, &histOut);
 
 			// outputs histogram runtime along with memeory transfer time
-			std::cout << "Kernel execution time [ns]:" << HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - HistEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(HistEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Image transfer time [ns]:" << inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - inIamgeTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "binsize transfer time [ns]:" << dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - dividerTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -424,7 +422,6 @@ int main(int argc, char **argv) {
 				queue.enqueueReadBuffer(sumsBuffer, CL_TRUE, 0, groupSums.size() * sizeof(unsigned int), groupSums.data(), NULL);
 
 				// outputs histogram runtime along with memeory transfer time
-				std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 				std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -451,7 +448,6 @@ int main(int argc, char **argv) {
 				queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 				// outputs histogram runtime along with memeory transfer time
-				std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 				std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -514,7 +510,6 @@ int main(int argc, char **argv) {
 				queue.enqueueReadBuffer(sumsBuffer, CL_TRUE, 0, groupSums.size() * sizeof(unsigned int), groupSums.data(), NULL);
 
 				// outputs histogram runtime along with memeory transfer time
-				std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 				std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -536,7 +531,6 @@ int main(int argc, char **argv) {
 				queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 				// outputs histogram runtime along with memeory transfer time
-				std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 				std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 				std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -600,7 +594,6 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(numberBuffer, CL_TRUE, 0, minStorage.size() * sizeof(unsigned int), minStorage.data(), NULL, &MinOutEvent);
 
 			// outputs histogram runtime along with memeory transfer time
-			std::cout << "Kernel execution time [ns]:" << MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(MinEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input min transfer time [ns]:" << MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output min transfer time [ns]:" << MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - MinOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -723,7 +716,6 @@ int main(int argc, char **argv) {
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
 			// outputs histogram runtime along with memeory transfer time
-			std::cout << "Kernel execution time [ns]:" << NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(NormEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Min transfer time [ns]:" << NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMinEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Max transfer time [ns]:" << NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - NormMaxEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -843,7 +835,6 @@ int main(int argc, char **argv) {
 			}
 
 			// outputs histogram runtime along with memeory transfer time
-			std::cout << "Kernel execution time [ns]:" << EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - EqEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(EqEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input image already stored in buffer" << endl;
 			std::cout << "bin divider already stored in buffer" << endl;
