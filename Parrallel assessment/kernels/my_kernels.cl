@@ -4,7 +4,7 @@ kernel void histogram(global const uint* A, global uint* H, global uint* binsDiv
 	
 	// gets the current index
 	int id = get_global_id(0);
-
+	int lid = get_local_id(0);
 
 	// gets the intensity value from the image and calculates it's bin
 	uint pixel = A[id];
@@ -90,13 +90,14 @@ kernel void blelloch(global  uint* A) {
 }
 
 // cumulative histogram using Blelloch scan on local memory
-kernel void blelloch_local(global  uint* A, local uint* l) {
+kernel void blelloch_local(global  uint* A, global uint* sums,local uint* l, local uint* temp) {
 	
 	// get index values
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
-	int n = get_global_size(0);
+	int n = get_local_size(0);
 	int t;
+	int group = get_group_id(0);
 
 	// passes global memory to local
 	l[lid] = A[id];
@@ -137,6 +138,9 @@ kernel void blelloch_local(global  uint* A, local uint* l) {
 	}
 
 
+	if(lid == n-1){
+		sums[group] = l[lid];
+	}
 
 	// adds to local memory to global
 	atomic_xchg(&A[id], l[lid]);
@@ -167,10 +171,11 @@ kernel void hs(global uint* A, global uint* B) {
 }
 
 // Hillis-Steele basic inclusive scan on local memory
-kernel void hs_local(global uint* A, global uint* B, local uint* lA, local uint* lB) {
+kernel void hs_local(global uint* A, global uint* B, global uint* sum,local uint* lA, local uint* lB) {
 	int id = get_global_id(0);
-	int N = get_global_size(0);
+	int N = get_local_size(0);
 	int lid = get_local_id(0);
+	int group = get_group_id(0);
 
 	lA[lid] = A[id];
 
@@ -194,8 +199,21 @@ kernel void hs_local(global uint* A, global uint* B, local uint* lA, local uint*
 		C = lA; lA = lB; lB = C; //swap A & B between steps
 	}
 
+	if(lid == N-1){
+		sum[group] = lB[lid];
+	}
+
+
 	// adds local memory to global
 	atomic_xchg(&B[id], lB[lid]);
+}
+
+
+kernel void local_Sum(global uint* hist, global uint* sums){
+	int id = get_global_id(0);
+	int group = get_group_id(0);
+
+	hist[id] += sums[group];
 }
 
 // a kernel to find the smallest non 0 number in the dataset

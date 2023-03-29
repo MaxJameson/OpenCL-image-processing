@@ -9,7 +9,36 @@
 
 using namespace cimg_library;
 
+std::vector<unsigned int> localsum(vector<unsigned int> pixels, vector<unsigned int> sums, int LocalSize, cl::Context context, cl::CommandQueue queue, cl::Program program) {
+	
 
+	// calculates value to add to each local group
+	for (int i = 1; i < sums.size(); i++) {
+		sums[i] += sums[i - 1];
+	}
+	//std::cout << sums << endl;
+
+	// creates buffer for bin calculator and the input image - buffers used in more than one Kernel
+	cl::Buffer pixelsBuffer(context, CL_MEM_READ_ONLY, pixels.size() * sizeof(unsigned int));
+	cl::Buffer sumsBuffer(context, CL_MEM_READ_ONLY, sums.size() * sizeof(unsigned int));
+
+	queue.enqueueWriteBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), &pixels[0], NULL);
+	queue.enqueueWriteBuffer(sumsBuffer, CL_TRUE, 0, sums.size() * sizeof(unsigned int), &sums[0], NULL);
+
+	// creates kernel and sets argumements
+	cl::Kernel sum_Kernel(program, "local_Sum");
+	sum_Kernel.setArg(0, pixelsBuffer);
+	sum_Kernel.setArg(1, sumsBuffer);
+
+	// runs kernel
+	queue.enqueueNDRangeKernel(sum_Kernel, cl::NDRange(LocalSize), cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL);
+	// reads output histogram from the buffer
+	queue.enqueueReadBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), pixels.data(), NULL);
+	
+	//std::cout << pixels << endl;
+	
+	return pixels;
+}
 
 
 int gcd(int a, int b)
@@ -97,7 +126,12 @@ int main(int argc, char **argv) {
 
 		cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
 
-		std::cout << "" << endl;
+		//std::cout << "" << endl;
+		//std::vector<unsigned int> A = { 1, 5, 7, 7, 9, 12 ,13 ,18, 2, 5, 11, 12, 17, 20, 22 ,25 };
+		//std::vector<unsigned int> B = {18, 25};
+
+
+		//std::vector<unsigned int> tester = localsum(A , B, 8, context, queue, program);
 
 		////////////////////////////////////////////////////////
 		/////////////// Image and bin formatting
@@ -109,8 +143,6 @@ int main(int argc, char **argv) {
 
 		// converts input file to a Cimg - 16bit
 		CImg<unsigned short> image_input16(image_filename.c_str());
-
-
 
 		// stores the values of each pixel from the image
 		std::vector<unsigned int> pixels;
@@ -198,11 +230,11 @@ int main(int argc, char **argv) {
 		while (!binCheck) {
 
 			// takes input for bin
-			std::cout << "Please enter the number of bins you would like between the range of 32 - 256: "; // Type a number and press enter
+			std::cout << "Please enter the number of bins you would like between the range of 32 - " << bits << ": "; // Type a number and press enter
 			std::cin >> bins; // Get user input from the keyboard
 
 			// checsk if input is valid
-			if (bins < 32 || bins > 256) {
+			if (bins < 32 || bins > bits) {
 				std::cout << "Invalid input " << endl;
 				std::cin.clear();
 				std::cin.ignore(1, '\n');
@@ -341,7 +373,6 @@ int main(int argc, char **argv) {
 
 		// asks user to choose scan type
 		string scanType;
-		string LorG;
 		std::cout << "Please select which scan method you would like to run. H = Hillis-Steele B == Blelloch(Default) S = Serial: "; // Type a number and press enter
 		std::cin >> scanType; // Get user input from the keyboard
 		if (scanType == "H" || scanType == "h") {
@@ -351,22 +382,44 @@ int main(int argc, char **argv) {
 			// creates and writes buffer for input and ouput histograms
 			cl::Buffer OuthistogramBuffer(context, CL_MEM_READ_WRITE, bins * sizeof(unsigned int));
 			// sets up kernel for cumulative histogram histogram and passes arguments
+						// asks user to choose between a local and global scan
 
-			// asks user to choose between a local and global scan
-			std::cout << "Would you like to run in L = local or G = global(Default): "; // Type a number and press enter
-			std::cin >> LorG; // Get user input from the keyboard
 
-			if (LorG == "L" || LorG == "l") {
+			if (bins > 256) {
 
 				std::cout << "Local selected" << endl;
 
 				// runs kernel for local Hillis-steele scan
 				cl::Kernel Cumulative_kernel(program, "hs_local");
+
+				// calculates optimim bin size for kernel
+				int LocalSize = gcd(pixels.size(), Cumulative_kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+
+				std::vector<unsigned int>groupSums(bins / LocalSize);
+				cl::Buffer sumsBuffer(context, CL_MEM_READ_WRITE, groupSums.size() * sizeof(unsigned int));
+				
+				std::cout << "Local_Size: " << LocalSize << endl;
+
 				Cumulative_kernel.setArg(0, ChistogramBuffer);
 				Cumulative_kernel.setArg(1, OuthistogramBuffer);
-				Cumulative_kernel.setArg(2, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				Cumulative_kernel.setArg(3, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+				Cumulative_kernel.setArg(2, sumsBuffer);
+				Cumulative_kernel.setArg(3, cl::Local(LocalSize * sizeof(unsigned int)));
+				Cumulative_kernel.setArg(4, cl::Local(LocalSize * sizeof(unsigned int)));
+				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(LocalSize), NULL, &ScanEvent);
+
+				// reads output histogram from the buffer
+				queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
+
+				// reads output histogram from the buffer
+				queue.enqueueReadBuffer(sumsBuffer, CL_TRUE, 0, groupSums.size() * sizeof(unsigned int), groupSums.data(), NULL);
+
+				//std::cout << "Sums" << groupSums << endl;
+
+				if (LocalSize != bins) {
+					CumulativeHistogramData = localsum(CumulativeHistogramData, groupSums, LocalSize, context, queue, program);
+				}
+
 			}
 			else {
 
@@ -376,12 +429,11 @@ int main(int argc, char **argv) {
 				Cumulative_Kernel.setArg(0, ChistogramBuffer);
 				Cumulative_Kernel.setArg(1, OuthistogramBuffer);
 				queue.enqueueNDRangeKernel(Cumulative_Kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+
+				// reads output histogram from the buffer
+				queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 			}
 
-
-
-			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(OuthistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			// outputs histogram runtime along with memeory transfer time
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
@@ -417,17 +469,37 @@ int main(int argc, char **argv) {
 			// runs Blelloch
 			std::cout << "Blelloch selected" << endl;
 
-			// asks user to choose between a local and global scan
-			std::cout << "Would you like to run in L = local or G = global(Default): ";
-			std::cin >> LorG;
 
-			if (LorG == "L" || LorG == "l") {
+			if (bins > 256) {
 
 				// runs kernel for local Blelloch scan
 				cl::Kernel Cumulative_kernel(program, "blelloch_local");
+
+				// calculates optimim bin size for kernel
+				int LocalSize = gcd(pixels.size(), Cumulative_kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+
+
+				std::vector<unsigned int>groupSums(bins / LocalSize);
+				cl::Buffer sumsBuffer(context, CL_MEM_READ_WRITE, groupSums.size() * sizeof(unsigned int));
+
 				Cumulative_kernel.setArg(0, ChistogramBuffer);
-				Cumulative_kernel.setArg(1, cl::Local(histogramData.size() * sizeof(unsigned int)));
-				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+				Cumulative_kernel.setArg(1, sumsBuffer);
+				Cumulative_kernel.setArg(2, cl::Local(LocalSize * sizeof(unsigned int)));
+				Cumulative_kernel.setArg(3, cl::Local(LocalSize * sizeof(unsigned int)));
+
+				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(LocalSize), NULL, &ScanEvent);
+
+				queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
+
+				// reads output histogram from the buffer
+				queue.enqueueReadBuffer(sumsBuffer, CL_TRUE, 0, groupSums.size() * sizeof(unsigned int), groupSums.data(), NULL);
+
+
+				if (LocalSize != bins) {
+					CumulativeHistogramData = localsum(CumulativeHistogramData, groupSums, LocalSize, context, queue, program);
+				}
+
+
 			}
 			else {
 
@@ -435,16 +507,18 @@ int main(int argc, char **argv) {
 				cl::Kernel Cumulative_kernel(program, "blelloch");
 				Cumulative_kernel.setArg(0, ChistogramBuffer);
 				queue.enqueueNDRangeKernel(Cumulative_kernel, cl::NullRange, cl::NDRange(histogramData.size()), cl::NDRange(bins), NULL, &ScanEvent);
+				// reads output histogram from the buffer
+				queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
+
 			}
 
-			// reads output histogram from the buffer
-			queue.enqueueReadBuffer(ChistogramBuffer, CL_TRUE, 0, CumulativeHistogramData.size() * sizeof(unsigned int), CumulativeHistogramData.data(), NULL, &ScanOutEvent);
 
 			// outputs histogram runtime along with memeory transfer time
 			std::cout << "Kernel execution time [ns]:" << ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << GetFullProfilingInfo(ScanEvent, ProfilingResolution::PROF_NS) << std::endl;
 			std::cout << "Input histogram transfer time [ns]:" << ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanInEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 			std::cout << "Output histogram transfer time [ns]:" << ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - ScanOutEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+
 		}
 ;
 		
@@ -615,7 +689,10 @@ int main(int argc, char **argv) {
 			Normalise_kernel.setArg(1, minNumBuffer);
 			Normalise_kernel.setArg(2, maxNumBuffer);
 			Normalise_kernel.setArg(3, bitsBuffer);
-			queue.enqueueNDRangeKernel(Normalise_kernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(bins), NULL, &NormEvent);
+
+			// calculates optimim bin size for kernel
+			int LocalSize = gcd(pixels.size(), Normalise_kernel.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(device));
+			queue.enqueueNDRangeKernel(Normalise_kernel, cl::NullRange, cl::NDRange(CumulativeHistogramData.size()), cl::NDRange(LocalSize), NULL, &NormEvent);
 			// reads results from buffer
 			queue.enqueueReadBuffer(NhistogramBuffer, CL_TRUE, 0, NormalisedHistogramData.size() * sizeof(unsigned int), NormalisedHistogramData.data(), NULL, &NormOutEvent);
 
@@ -687,7 +764,7 @@ int main(int argc, char **argv) {
 			
 			// Get ending timepoint
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds> (stop - start);
 			std::cout << "Serial equalise took " << duration.count() << " NS" << endl;
 
 		}
