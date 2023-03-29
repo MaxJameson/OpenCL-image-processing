@@ -3,8 +3,7 @@
 kernel void histogram(global const uint* A, global uint* H, global uint* binsDivider) {
 	
 	// gets the current index
-	int id = get_global_id(0);
-	int lid = get_local_id(0);
+	int id = get_global_id(0);;
 
 	// gets the intensity value from the image and calculates it's bin
 	uint pixel = A[id];
@@ -16,31 +15,6 @@ kernel void histogram(global const uint* A, global uint* H, global uint* binsDiv
 	
 		// uses an atomic function to increment the current intensity
 		atomic_inc(&H[location]);
-	}
-
-}
-
-// locally counts the occurence of each intensity
-kernel void histogram_local( global const int * A, global int * H,global uint* binsDivider,local int * LH) {
-	// gets index values
-	int id = get_global_id(0); int lid = get_local_id(0);
-
-
-
-	// gets the intensity value from the image and calculates it's bin
-	uint pixel = A[id];
-	float bin = (uint)pixel / (*binsDivider);
-	uint location = round(bin);
-
-	// stores in a local histogram
-	atomic_inc(&LH[location]);
-	
-	// sync local memeory
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// combines local histograms
-	if (id < 256){
-		atomic_add(&H[id], LH[id]);
 	}
 
 }
@@ -241,7 +215,7 @@ kernel void reduce(global uint* A){
 }
 
 
-// A kenrel to normalise a histogram
+// a kenrel to normalise a histogram
 kernel void normalise( global uint* A, global uint* min, global uint* max, global uint* bits) {
 	int id = get_global_id(0);
 

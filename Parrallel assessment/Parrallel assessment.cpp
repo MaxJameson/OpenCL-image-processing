@@ -12,18 +12,25 @@ using namespace cimg_library;
 // calculates for cumulative sum for a group of local cumulative sums
 std::vector<unsigned int> localsum(vector<unsigned int> pixels, vector<unsigned int> sums, int LocalSize, cl::Context context, cl::CommandQueue queue, cl::Program program) {
 	
+	std::cout << "" << endl;
+	std::cout << "Cumulative sum carried out on local memory, sum of cumulative sum required" << endl;
 
 	// calculates value to add to each local group
 	for (int i = 1; i < sums.size(); i++) {
 		sums[i] += sums[i - 1];
 	}
 
+	cl::Event pixelTransfer;
+	cl::Event sumsTransfer;
+	cl::Event sumEvent;
+	cl::Event outputTansfer;
+
 
 	// creates buffer for pixels and local sums and write buffers to memeory
 	cl::Buffer pixelsBuffer(context, CL_MEM_READ_ONLY, pixels.size() * sizeof(unsigned int));
 	cl::Buffer sumsBuffer(context, CL_MEM_READ_ONLY, sums.size() * sizeof(unsigned int));
-	queue.enqueueWriteBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), &pixels[0], NULL);
-	queue.enqueueWriteBuffer(sumsBuffer, CL_TRUE, 0, sums.size() * sizeof(unsigned int), &sums[0], NULL);
+	queue.enqueueWriteBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), &pixels[0], NULL, &pixelTransfer);
+	queue.enqueueWriteBuffer(sumsBuffer, CL_TRUE, 0, sums.size() * sizeof(unsigned int), &sums[0], NULL, &sumsTransfer);
 
 	// creates and sets arugments for kernel which calculates cumulative sum
 	cl::Kernel sum_Kernel(program, "local_Sum");
@@ -31,9 +38,16 @@ std::vector<unsigned int> localsum(vector<unsigned int> pixels, vector<unsigned 
 	sum_Kernel.setArg(1, sumsBuffer);
 
 	// runs kernel with an offset to above adding the wrong sum to each group
-	queue.enqueueNDRangeKernel(sum_Kernel, cl::NDRange(LocalSize), cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL);
+	queue.enqueueNDRangeKernel(sum_Kernel, cl::NDRange(LocalSize), cl::NDRange(pixels.size()), cl::NDRange(LocalSize), NULL, &sumEvent);
 	// reads output histogram from the buffer
-	queue.enqueueReadBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), pixels.data(), NULL);
+	queue.enqueueReadBuffer(pixelsBuffer, CL_TRUE, 0, pixels.size() * sizeof(unsigned int), pixels.data(), NULL, &outputTansfer);
+
+	// outputs 
+	std::cout << "Kernel execution time [ns]:" << sumEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() - sumEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+	std::cout << GetFullProfilingInfo(sumEvent, ProfilingResolution::PROF_NS) << std::endl;
+	std::cout << "Image transfer time [ns]:" << pixelTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - pixelTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+	std::cout << "binsize transfer time [ns]:" << sumsTransfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - sumsTransfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
+	std::cout << "Output transfer time [ns]:" << outputTansfer.getProfilingInfo<CL_PROFILING_COMMAND_END>() - outputTansfer.getProfilingInfo<CL_PROFILING_COMMAND_START>() << std::endl;
 	
 
 	// returns cumulative histogram back to main program
@@ -125,10 +139,6 @@ int main(int argc, char **argv) {
 		}
 
 		cl::Device device = context.getInfo<CL_CONTEXT_DEVICES>()[0];
-
-		//std::cout << "" << endl;
-		//std::vector<unsigned int> A = { 1, 5, 7, 7, 9, 12 ,13 ,18, 2, 5, 11, 12, 17, 20, 22 ,25 };
-		//std::vector<unsigned int> B = {18, 25};
 
 
 		//std::vector<unsigned int> tester = localsum(A , B, 8, context, queue, program);
@@ -858,6 +868,8 @@ int main(int argc, char **argv) {
 			CImgDisplay disp_input(image_input16, "input");
 			CImgDisplay disp_output(output_image, "output");
 
+			std::cout << "" << endl;
+
 			// stops and displays overall program timer
 			auto Mainstop = std::chrono::high_resolution_clock::now();
 			auto Mainduration = std::chrono::duration_cast<std::chrono::nanoseconds>(Mainstop - Mainstart);
@@ -884,6 +896,8 @@ int main(int argc, char **argv) {
 			// displays original and equalised images
 			CImgDisplay disp_input(image_input, "input");
 			CImgDisplay disp_output(output_image, "output");
+
+			std::cout << "" << endl;
 
 			// stops and displays overall program timer
 			auto Mainstop = std::chrono::high_resolution_clock::now();
